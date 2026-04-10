@@ -7,6 +7,10 @@ export const metadata = {
   title: "NewsPulse | Smart News Tracker",
   description: "Stay ahead with real-time news tailored to your interests.",
   manifest: "/manifest.json",
+  icons: {
+    icon: '/icon-192x192.png',
+    apple: '/icon-192x192.png',
+  },
 };
 
 export const viewport = {

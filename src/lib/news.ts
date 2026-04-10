@@ -40,8 +40,8 @@ function getMockNews(keywords: string[]): NewsArticle[] {
   const allMockNews: NewsArticle[] = [
     {
       id: "m1",
-      title: "Kebangkitan Startup Teknologi di Indonesia 2026",
-      description: "Jakarta menjadi hub teknologi utama di Asia Tenggara dengan munculnya berbagai unicorn baru di bidang AI dan Green Tech.",
+      title: "The Rise of Tech Startups in SE Asia 2026",
+      description: "Jakarta emerges as a major tech hub in Southeast Asia with the rise of new AI and Green Tech unicorns.",
       url: "#",
       image: "https://picsum.photos/seed/indo1/400/200",
       source: "IndoTech (Mock)",
@@ -49,11 +49,11 @@ function getMockNews(keywords: string[]): NewsArticle[] {
     },
     {
       id: "m2",
-      title: "Pariwisata Indonesia Mengalami Lonjakan Signifikan",
-      description: "Bali dan Labuan Bajo tetap menjadi primadona, sementara destinasi baru di Kalimantan mulai menarik perhatian dunia.",
+      title: "Indonesian Tourism Experiences Significant Surge",
+      description: "Bali and Labuan Bajo remain favorites, while new destinations in Kalimantan begin to attract world attention.",
       url: "#",
       image: "https://picsum.photos/seed/indo2/400/200",
-      source: "Warta Wisata (Mock)",
+      source: "TravelWarta (Mock)",
       publishedAt: new Date().toISOString()
     },
     {
@@ -76,11 +76,11 @@ function getMockNews(keywords: string[]): NewsArticle[] {
     },
     {
       id: "m5",
-      title: "Ekonomi Indonesia Tumbuh Stabil di Tengah Ketidakpastian Global",
-      description: "Laporan terbaru menunjukkan ketahanan ekonomi nasional didorong oleh konsumsi domestik dan ekspor komoditas.",
+      title: "Indonesia's Economy Grows Steadily Amid Global Uncertainty",
+      description: "Latest reports show national economic resilience driven by domestic consumption and commodity exports.",
       url: "#",
       image: "https://picsum.photos/seed/economy/400/200",
-      source: "Bisnis Update (Mock)",
+      source: "BusinessUpdate (Mock)",
       publishedAt: new Date().toISOString()
     }
   ];

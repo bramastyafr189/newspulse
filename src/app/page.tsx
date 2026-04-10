@@ -19,7 +19,11 @@ import {
   Zap,
   LayoutGrid,
   RefreshCcw,
-  Volume2
+  Volume2,
+  Home as HomeIcon,
+  Compass,
+  User,
+  ChevronDown
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { fetchNews, NewsArticle } from "@/lib/news";
@@ -69,6 +73,8 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+  const [groupToDelete, setGroupToDelete] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'home' | 'explore' | 'account'>('home');
 
   const groupsRef = useRef<InterestGroup[]>([]);
 
@@ -111,6 +117,26 @@ export default function Home() {
     setNotificationsAllowed(permission === "granted");
   };
 
+  const testNotification = () => {
+    if (Notification.permission === "granted") {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then(reg => {
+          reg.showNotification("NewsPulse Target Acquired", {
+            body: "Push notifications are successfully configured and active!",
+            icon: "/icon-192x192.png"
+          });
+        });
+      } else {
+        new Notification("NewsPulse Target Acquired", {
+          body: "Push notifications are successfully configured and active!",
+          icon: "/icon-192x192.png"
+        });
+      }
+    } else {
+      alert("Please allow notifications first!");
+    }
+  };
+
   const handleFetch = async (keywords: string[], lang?: string | null, country?: string | null, groupId?: number) => {
     if (groupId === activeGroupId) setLoading(true);
     try {
@@ -147,12 +173,13 @@ export default function Home() {
     }
   };
 
-  // Background Polling Logic
+  // Background Polling Logic: Ensures news is always fresh and alerts are sent
   useEffect(() => {
     const pollInterval = setInterval(async () => {
       const now = new Date();
       
       for (const group of groupsRef.current) {
+        // Skip if alerts are off (to save API quota), or no keywords/interval defined
         if (!group.notificationsEnabled || group.refreshInterval <= 0 || group.keywords.length === 0) continue;
         
         const lastScan = group.lastScanAt ? new Date(group.lastScanAt) : new Date(0);
@@ -170,15 +197,16 @@ export default function Home() {
           // Find "New" articles (published after last scan)
           const newArticles = fetchedNews.filter(a => new Date(a.publishedAt) > lastScan);
           
-          if (newArticles.length > 0 && Notification.permission === "granted") {
+          // Only notify if alerts are specifically enabled for this group AND browser permission is granted
+          if (group.notificationsEnabled && newArticles.length > 0 && Notification.permission === "granted") {
             new Notification(`NewsPulse: ${group.name}`, {
               body: `${newArticles.length} new articles found for your keywords!`,
-              icon: '/icons/icon-192x192.png'
+              icon: '/icon-192x192.png'
             });
           }
         }
       }
-    }, 60000); // Check every minute
+    }, 60000); // Pulse check every minute
 
     return () => clearInterval(pollInterval);
   }, [activeGroupId]); // Re-run if active group id changes (to sync loading states correctly)
@@ -231,8 +259,9 @@ export default function Home() {
     }
   };
 
-  const deleteGroup = async (id: number) => {
-    if (!confirm("Hapus grup ini?")) return;
+  const deleteGroup = async () => {
+    if (!groupToDelete) return;
+    const id = groupToDelete;
     try {
       await fetch(`/api/interests?id=${id}`, { method: 'DELETE' });
       const newGroups = groups.filter(g => g.id !== id);
@@ -240,6 +269,7 @@ export default function Home() {
       if (activeGroupId === id) {
         setActiveGroupId(newGroups.length > 0 ? newGroups[0].id : null);
       }
+      setGroupToDelete(null);
     } catch (e) {
       console.error(e);
     }
@@ -281,35 +311,27 @@ export default function Home() {
   };
 
   return (
-    <main className="fade-in pb-10">
+    <main className="relative z-0 pb-28">
       <div className="bg-blob-1" />
       <div className="bg-blob-2" />
       {/* Premium Navigation */}
-      <nav className="glass fixed top-0 left-0 right-0 z-50 px-6 py-4">
+      <nav className="glass fixed top-0 left-0 right-0 z-50 px-6 py-4 fade-in">
         <div className="nav-container mx-auto">
           <motion.div 
             initial={{ x: -20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             className="flex items-center gap-3"
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-accent to-purple-400 flex items-center justify-center shadow-lg shadow-accent/30">
-              <Zap size={22} className="text-white" fill="white" />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden">
+              <img src="/icon-192x192.png" alt="NewsPulse Logo" className="w-full h-full object-cover" />
             </div>
             <div className="flex flex-col">
-              <h1 className="text-lg font-black tracking-tighter leading-none">NEWSPULSE</h1>
-              <span className="text-[10px] font-bold text-accent tracking-[.2em] uppercase">V2 PRO</span>
+              <h1 className="text-lg font-black tracking-tighter leading-none">NEWS</h1>
+              <span className="text-[10px] font-bold text-accent tracking-[.2em] uppercase">PULSE</span>
             </div>
           </motion.div>
           
           <div className="flex items-center gap-2">
-            {!notificationsAllowed && (
-              <button 
-                onClick={requestNotificationPermission}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-accent text-white text-[10px] font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all"
-              >
-                <Bell size={14} /> Enable Alerts
-              </button>
-            )}
             <button 
               onClick={() => setShowSettings(!showSettings)}
               className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center border border-white/5 hover:bg-white/10 transition-all active:scale-95"
@@ -320,7 +342,9 @@ export default function Home() {
         </div>
       </nav>
 
-      <div className="content-wrapper max-w-[720px] px-6 sm:px-10 w-full">
+      {/* RENDER CONTENT BASED ON TAB */}
+      {activeTab === 'home' && (
+        <div className="pt-28 px-4 sm:px-6 w-full max-w-[720px] mx-auto flex flex-col gap-6 fade-in">
         
         {/* Horizontal Channel Bar */}
         <section className="flex flex-col gap-6">
@@ -384,15 +408,18 @@ export default function Home() {
                     className="input-field"
                   />
                   <div className="grid grid-cols-2 gap-3">
-                    <select 
-                      value={newGroupLang}
-                      onChange={(e) => setNewGroupLang(e.target.value)}
-                      className="input-field py-3 text-sm appearance-none cursor-pointer"
-                    >
-                      {LANGUAGES.map(l => (
-                        <option key={l.code} value={l.code}>{l.flag} {l.name}</option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <select 
+                        value={newGroupLang}
+                        onChange={(e) => setNewGroupLang(e.target.value)}
+                        className="input-field py-3 pr-10 text-sm appearance-none cursor-pointer"
+                      >
+                        {LANGUAGES.map(l => (
+                          <option key={l.code} value={l.code}>{l.flag} {l.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+                    </div>
                     <button onClick={createGroup} className="button-primary py-3">
                       Initialize
                     </button>
@@ -428,7 +455,7 @@ export default function Home() {
                     <h3 className="text-4xl sm:text-5xl font-black uppercase tracking-tighter italic break-words leading-[0.9]">{activeGroup.name}</h3>
                   </div>
                   <button 
-                    onClick={() => deleteGroup(activeGroup.id)} 
+                    onClick={() => setGroupToDelete(activeGroup.id)} 
                     className="w-12 h-12 rounded-2xl bg-white/5 flex-shrink-0 flex items-center justify-center hover:bg-error/20 hover:text-error transition-all border border-white/5"
                   >
                     <Trash2 size={20} />
@@ -457,15 +484,18 @@ export default function Home() {
                         <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Interval</span>
                         <span className="text-xs font-bold text-white uppercase">{INTERVAL_OPTIONS.find(o => o.value === activeGroup.refreshInterval)?.label}</span>
                       </div>
-                      <select 
-                        value={activeGroup.refreshInterval}
-                        onChange={(e) => updateGroupSetting(activeGroup.id, { refreshInterval: parseInt(e.target.value) })}
-                        className="bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 text-[10px] font-black text-white outline-none cursor-pointer"
-                      >
-                        {INTERVAL_OPTIONS.map(opt => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <select 
+                          value={activeGroup.refreshInterval}
+                          onChange={(e) => updateGroupSetting(activeGroup.id, { refreshInterval: parseInt(e.target.value) })}
+                          className="bg-black/40 border border-white/10 rounded-xl pl-3 pr-10 py-1.5 text-[10px] font-black text-white outline-none cursor-pointer appearance-none hover:border-white/20 transition-all"
+                        >
+                          {INTERVAL_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value} className="bg-[#121214]">{opt.label}</option>
+                          ))}
+                        </select>
+                        <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+                      </div>
                    </div>
                 </div>
                 
@@ -517,15 +547,18 @@ export default function Home() {
                   <div className="flex items-center gap-4">
                     <div className="flex flex-col gap-2">
                       <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Source Localization</span>
-                      <select 
-                        value={activeGroup.language || 'any'}
-                        onChange={(e) => updateGroupSetting(activeGroup.id, { language: e.target.value === 'any' ? null : e.target.value })}
-                        className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs font-black text-white outline-none cursor-pointer hover:border-accent transition-all min-w-[160px] shadow-inner"
-                      >
-                        {LANGUAGES.map(l => (
-                          <option key={l.code} value={l.code} className="bg-[#121214]">{l.flag} {l.name}</option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <select 
+                          value={activeGroup.language || 'any'}
+                          onChange={(e) => updateGroupSetting(activeGroup.id, { language: e.target.value === 'any' ? null : e.target.value })}
+                          className="bg-black/40 border border-white/10 rounded-xl pl-4 pr-12 py-3 text-xs font-black text-white outline-none cursor-pointer hover:border-accent transition-all min-w-[180px] shadow-inner appearance-none"
+                        >
+                          {LANGUAGES.map(l => (
+                            <option key={l.code} value={l.code} className="bg-[#121214]">{l.flag} {l.name}</option>
+                          ))}
+                        </select>
+                        <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+                      </div>
                     </div>
                   </div>
                   <button 
@@ -585,10 +618,9 @@ export default function Home() {
                   initial={{ opacity: 0, scale: 0.95, y: 20 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   transition={{ 
-                    duration: 0.5,
-                    delay: i * 0.05,
-                    type: "spring",
-                    stiffness: 100
+                    duration: 0.4,
+                    delay: i * 0.04,
+                    ease: "easeOut"
                   }}
                   className="card-rich group cursor-pointer"
                   onClick={() => window.open(article.url, '_blank')}
@@ -597,6 +629,7 @@ export default function Home() {
                     {article.image ? (
                       <img 
                         src={article.image} 
+                        loading="lazy"
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
                         alt=""
                         onError={(e) => {
@@ -656,6 +689,58 @@ export default function Home() {
           )}
         </section>
       </div>
+      )}
+
+      {activeTab === 'explore' && (
+        <div className="pt-32 px-4 flex flex-col items-center justify-center min-h-[60vh] text-center w-full max-w-[720px] mx-auto gap-6 fade-in">
+          <div className="w-24 h-24 rounded-full border border-white/10 bg-white/5 flex flex-col gap-2 items-center justify-center">
+             <Compass size={40} className="text-white/20" />
+          </div>
+          <div className="flex flex-col gap-2">
+            <h2 className="text-3xl font-black italic tracking-tighter uppercase">Explore</h2>
+            <p className="text-sm font-bold text-white/30 uppercase tracking-widest">Coming Soon</p>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'account' && (
+        <div className="pt-32 px-4 flex flex-col items-center justify-center min-h-[60vh] text-center w-full max-w-[720px] mx-auto gap-6 fade-in">
+          <div className="w-24 h-24 rounded-full border border-white/10 bg-white/5 flex flex-col gap-2 items-center justify-center text-accent/20">
+             <User size={40} strokeWidth={1.5} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <h2 className="text-3xl font-black italic tracking-tighter uppercase">Account</h2>
+            <p className="text-sm font-bold text-white/30 uppercase tracking-widest">Coming Soon</p>
+          </div>
+        </div>
+      )}
+
+      {/* Premium Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#050507]/90 backdrop-blur-3xl border-t border-white/10 pb-safe pb-4 sm:pb-6 pt-4 px-6 flex items-center justify-center fade-in">
+        <div className="flex items-center gap-12 sm:gap-24">
+           <button 
+             onClick={() => setActiveTab('home')}
+             className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'home' ? 'text-accent scale-110 drop-shadow-[0_0_15px_rgba(129,76,255,0.8)]' : 'text-white/40 hover:text-white/70'}`}
+           >
+             <HomeIcon size={24} strokeWidth={activeTab === 'home' ? 2.5 : 2} />
+             <span className="text-[9px] font-black uppercase tracking-widest">Home</span>
+           </button>
+           <button 
+             onClick={() => setActiveTab('explore')}
+             className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'explore' ? 'text-accent scale-110 drop-shadow-[0_0_15px_rgba(129,76,255,0.8)]' : 'text-white/40 hover:text-white/70'}`}
+           >
+             <Compass size={24} strokeWidth={activeTab === 'explore' ? 2.5 : 2} />
+             <span className="text-[9px] font-black uppercase tracking-widest">Explore</span>
+           </button>
+           <button 
+             onClick={() => setActiveTab('account')}
+             className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'account' ? 'text-accent scale-110 drop-shadow-[0_0_15px_rgba(129,76,255,0.8)]' : 'text-white/40 hover:text-white/70'}`}
+           >
+             <User size={24} strokeWidth={activeTab === 'account' ? 2.5 : 2} />
+             <span className="text-[9px] font-black uppercase tracking-widest">Account</span>
+           </button>
+        </div>
+      </nav>
 
       {/* Modern tray Settings */}
       <AnimatePresence>
@@ -664,7 +749,7 @@ export default function Home() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-xl flex items-end justify-center"
+            className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-xl flex items-end justify-center p-0"
             onClick={() => setShowSettings(false)}
           >
             <motion.div 
@@ -672,99 +757,143 @@ export default function Home() {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="bg-[#0a0a0c] w-full max-w-lg rounded-t-[48px] p-10 border-t border-white/10 flex flex-col gap-8"
+              className="bg-[#0a0a0c] w-full max-w-2xl rounded-t-[48px] p-6 sm:p-8 border border-white/10 border-b-0 flex flex-col gap-5 max-h-[85vh] overflow-y-auto no-scrollbar shadow-2xl"
               onClick={e => e.stopPropagation()}
             >
-              <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-2" />
-              
-              <div className="flex items-center justify-between">
+              <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-2 flex-shrink-0" />
+              <div className="flex items-center justify-between flex-shrink-0">
                 <div className="flex flex-col">
-                  <h3 className="text-3xl font-black italic uppercase tracking-tighter">System</h3>
-                  <p className="text-sm text-white/30">Application Configuration</p>
+                  <h3 className="text-2xl font-black italic uppercase tracking-tighter">System Config</h3>
+                  <p className="text-xs text-white/30 hidden sm:block">Application control panel</p>
                 </div>
-                <button onClick={() => setShowSettings(false)} className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
-                  <X size={24} />
+                <button onClick={() => setShowSettings(false)} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center flex-shrink-0 hover:bg-white/10 transition-all">
+                  <X size={18} />
                 </button>
               </div>
 
-              <div className="flex flex-col gap-4">
-                <div className="card bg-white/5 border-white/5 p-6 flex flex-col gap-6">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className={`p-4 rounded-2xl ${notificationsAllowed ? 'bg-accent/20 text-accent' : 'bg-white/5 text-muted'}`}>
-                            {notificationsAllowed ? <Bell size={28} /> : <BellOff size={28} />}
-                            </div>
-                            <div className="flex flex-col">
-                            <span className="font-black text-lg tracking-tight">BROWSER ALERTS</span>
-                            <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">{notificationsAllowed ? 'Permission Granted' : 'Block Detected'}</span>
-                            </div>
-                        </div>
-                        {!notificationsAllowed && (
-                            <button onClick={requestNotificationPermission} className="text-accent text-[10px] font-black uppercase underline decoration-2 underline-offset-4">Fix</button>
-                        ) }
+              <div className="flex flex-col sm:grid sm:grid-cols-2 gap-4 flex-1">
+                {/* Column 1: Alerts & Sync */}
+                <div className="flex flex-col gap-4">
+                  <div className="card bg-white/5 border-white/5 p-4 flex flex-col gap-4">
+                      <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                              <div className={`p-3 rounded-xl ${notificationsAllowed ? 'bg-accent/20 text-accent' : 'bg-white/5 text-muted'}`}>
+                              {notificationsAllowed ? <Bell size={18} /> : <BellOff size={18} />}
+                              </div>
+                              <div className="flex flex-col">
+                              <span className="font-black text-sm tracking-tight text-white/90">ALERTS</span>
+                              <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">{notificationsAllowed ? 'Active' : 'Blocked'}</span>
+                              </div>
+                          </div>
+                          {!notificationsAllowed ? (
+                              <button onClick={requestNotificationPermission} className="text-accent text-[10px] font-black uppercase tracking-wider bg-accent/10 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-white transition-all">Fix</button>
+                          ) : (
+                              <button onClick={testNotification} className="text-accent text-[10px] font-black uppercase tracking-wider bg-accent/10 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-white transition-all">Test</button>
+                          )}
+                      </div>
+                  </div>
+
+                  <div className="card bg-white/5 border-white/5 p-4 flex flex-col gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 rounded-xl bg-accent/20 text-accent">
+                        <Volume2 size={18} />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-black text-sm tracking-tight text-white/90">PIPELINE SYNC</span>
+                        <span className="text-[9px] font-bold text-accent uppercase tracking-widest">Active</span>
+                      </div>
                     </div>
+                    <div className="h-1 bg-white/5 rounded-full relative overflow-hidden">
+                      <motion.div 
+                        animate={{ 
+                          x: ["-100%", "100%"]
+                        }}
+                        transition={{ 
+                          duration: 2, 
+                          repeat: Infinity,
+                          ease: "easeInOut" 
+                        }}
+                        className="h-full w-1/2 bg-accent rounded-full"
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="card bg-white/5 border-white/5 p-6 flex flex-col gap-6">
+                {/* Column 2: Bulk Actions (Moved inside a single card) */}
+                <div className="card bg-white/5 border-white/5 p-4 flex flex-col justify-between gap-4">
                   <div className="flex flex-col gap-1">
-                      <span className="font-black text-lg tracking-tight">GLOBAL AUTOMATION</span>
-                      <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Bulk Actions</span>
+                      <span className="font-black text-sm tracking-tight text-white/90">BULK ACTIONS</span>
+                      <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">Global Automation</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-2">
                       <button 
                         onClick={() => toggleAllNotifications(true)}
-                        className="bg-accent/10 border border-accent/20 text-accent text-[10px] font-black py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-accent hover:text-white transition-all uppercase tracking-widest"
+                        className="w-full bg-accent/10 border border-accent/20 text-accent text-xs font-black py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-accent hover:text-white transition-all uppercase tracking-widest"
                       >
-                         <Bell size={14} /> Activate All
+                         <Bell size={14} /> Enable All
                       </button>
                       <button 
                          onClick={() => toggleAllNotifications(false)}
-                         className="bg-white/5 border border-white/10 text-white/40 text-[10px] font-black py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-error/20 hover:text-error transition-all uppercase tracking-widest"
+                         className="w-full bg-white/5 border border-white/10 text-white/50 text-xs font-black py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-error/20 hover:text-error transition-all uppercase tracking-widest"
                       >
                          <BellOff size={14} /> Silence All
                       </button>
-                  </div>
-                </div>
-
-                <div className="card bg-white/5 border-white/5 p-6 flex flex-col gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="p-4 rounded-2xl bg-accent/20 text-accent">
-                      <Volume2 size={28} />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="font-black text-lg tracking-tight">GLOBAL SYNC</span>
-                      <span className="text-[10px] font-bold text-accent uppercase tracking-widest">Background Pipeline Active</span>
-                    </div>
-                  </div>
-                  <div className="h-2 bg-white/5 rounded-full relative">
-                    <motion.div 
-                      animate={{ 
-                        opacity: [0.3, 1, 0.3],
-                        scaleX: [1, 1.02, 1],
-                        backgroundColor: ["#814cff", "#a855f7", "#814cff"],
-                        boxShadow: [
-                            "0 0 0px rgba(129, 76, 255, 0)",
-                            "0 0 15px rgba(129, 76, 255, 0.8)",
-                            "0 0 0px rgba(129, 76, 255, 0)"
-                        ]
-                      }}
-                      transition={{ 
-                        duration: 2, 
-                        repeat: Infinity,
-                        ease: "easeInOut" 
-                      }}
-                      className="h-full w-full rounded-full origin-left"
-                    />
                   </div>
                 </div>
               </div>
 
               <button 
                 onClick={() => setShowSettings(false)} 
-                className="button-primary py-5 text-lg font-black uppercase italic tracking-tighter"
+                className="button-primary py-4 mt-2 text-sm font-black uppercase italic tracking-tighter flex-shrink-0"
               >
-                Close Settings
+                Close Panel
               </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+
+      {/* Premium Delete Confirmation Modal */}
+      <AnimatePresence>
+        {groupToDelete && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-xl"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="card max-w-[400px] w-full bg-gradient-to-br from-[#1a1b26] to-[#0a0b12] border-error/20 p-8 flex flex-col gap-6"
+            >
+              <div className="w-20 h-20 rounded-[32px] bg-error/10 flex items-center justify-center border border-error/20 mx-auto">
+                <Trash2 size={40} className="text-error" />
+              </div>
+              
+              <div className="flex flex-col gap-2 text-center">
+                <h3 className="text-xl font-black uppercase italic tracking-tighter">Destroy Channel?</h3>
+                <p className="text-sm text-white/40 leading-relaxed">
+                  Are you sure you want to delete <span className="text-white font-bold">"{groups.find(g => g.id === groupToDelete)?.name}"</span>? This action is irreversible.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mt-2">
+                <button 
+                  onClick={() => setGroupToDelete(null)}
+                  className="py-4 rounded-2xl bg-white/5 text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all border border-white/5"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={deleteGroup}
+                  className="py-4 rounded-2xl bg-error text-white text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all shadow-lg shadow-error/20"
+                >
+                  Confirm Delete
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}
