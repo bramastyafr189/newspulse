@@ -23,10 +23,38 @@ import {
   Home as HomeIcon,
   Compass,
   User,
-  ChevronDown
+  ChevronDown,
+  Calendar
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { fetchNews, NewsArticle } from "@/lib/news";
+
+// Helper for professional time formatting
+const formatTime = (dateStr: string) => {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+  
+  // Format to local HH:MM
+  const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  
+  if (diffInHours < 1) {
+    const mins = Math.max(1, Math.floor(diffInHours * 60));
+    return `${mins}M AGO • ${timeStr}`;
+  }
+  
+  if (date.toDateString() === now.toDateString()) {
+    return `TODAY • ${timeStr}`;
+  }
+  
+  const yesterday = new Date();
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) {
+    return `YESTERDAY • ${timeStr}`;
+  }
+  
+  return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' }).toUpperCase()} • ${timeStr}`;
+};
 
 interface InterestGroup {
   id: number;
@@ -74,9 +102,17 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [groupToDelete, setGroupToDelete] = useState<number | null>(null);
+  const [keywordToDelete, setKeywordToDelete] = useState<{ id: number; word: string } | null>(null);
   const [activeTab, setActiveTab] = useState<'home' | 'explore' | 'account'>('home');
   const [isGlobalSyncEnabled, setIsGlobalSyncEnabled] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
+
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  }, []);
 
   const groupsRef = useRef<InterestGroup[]>([]);
 
@@ -120,6 +156,7 @@ export default function Home() {
   const toggleGlobalSync = (enabled: boolean) => {
     setIsGlobalSyncEnabled(enabled);
     localStorage.setItem('newspulse_global_sync', String(enabled));
+    showToast(enabled ? "Global monitoring activated" : "Global monitoring suspended", enabled ? "success" : "info");
   };
 
   const activeGroup = groups.find(g => g.id === activeGroupId);
@@ -134,14 +171,14 @@ export default function Home() {
     if (Notification.permission === "granted") {
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.ready.then(reg => {
-          reg.showNotification("NewsPulse Target Acquired", {
-            body: "Push notifications are successfully configured and active!",
+          reg.showNotification("Intelligence Report: Target Acquired", {
+            body: "Encrypted signal established. Real-time surveillance protocols are active.",
             icon: "/icon-192x192.png"
           });
         });
       } else {
-        new Notification("NewsPulse Target Acquired", {
-          body: "Push notifications are successfully configured and active!",
+        new Notification("Intelligence Report: Target Acquired", {
+          body: "Encrypted signal established. Real-time surveillance protocols are active.",
           icon: "/icon-192x192.png"
         });
       }
@@ -253,8 +290,10 @@ export default function Home() {
       setNewGroupName("");
       setNewGroupLang("any");
       setIsCreatingGroup(false);
+      showToast(`Intelligence channel "${newGroup.name}" established`);
     } catch (e) {
       console.error(e);
+      showToast("Security breach: Failed to initialize channel", "error");
     }
   };
 
@@ -264,9 +303,23 @@ export default function Home() {
         method: 'PATCH',
         body: JSON.stringify(settings)
       });
+      const targetGroup = groups.find(g => g.id === id);
       setGroups(prev => prev.map(g => g.id === id ? { ...g, ...settings } : g));
+      
+      const gName = targetGroup?.name || "Channel";
+      if ('notificationsEnabled' in settings) {
+        showToast(settings.notificationsEnabled ? `"${gName}" monitoring activated` : `"${gName}" monitoring suspended`, "success");
+      } else if ('refreshInterval' in settings) {
+        showToast(`Tracking frequency for "${gName}" set to ${settings.refreshInterval} min`, "info");
+      } else if ('language' in settings) {
+        const langName = LANGUAGES.find(l => l.code === (settings.language || 'any'))?.name || "Global";
+        showToast(`Intelligence source for "${gName}" updated to ${langName}`, "success");
+      } else {
+        showToast(`Configuration protocols for "${gName}" updated`);
+      }
     } catch (e) {
       console.error(e);
+      showToast("Critical Error: Update sequence failed", "error");
     }
   };
 
@@ -280,8 +333,10 @@ export default function Home() {
         })
       ));
       setGroups(prev => prev.map(g => ({ ...g, notificationsEnabled: enabled })));
+      showToast(enabled ? "Bulk monitoring activated" : "Bulk monitoring suspended", enabled ? "success" : "info");
     } catch (e) {
       console.error(e);
+      showToast("Critical Error: Bulk update sequence aborted", "error");
     }
   };
 
@@ -295,9 +350,12 @@ export default function Home() {
       if (activeGroupId === id) {
         setActiveGroupId(newGroups.length > 0 ? newGroups[0].id : null);
       }
+      const deletedName = groups.find(g => g.id === id)?.name || "Channel";
       setGroupToDelete(null);
+      showToast(`Intelligence channel "${deletedName}" decommissioned`, "info");
     } catch (e) {
       console.error(e);
+      showToast("Security Breach: Decommissioning sequence failed", "error");
     }
   };
 
@@ -317,12 +375,20 @@ export default function Home() {
         return g;
       }));
       setNewKeyword("");
+      showToast(`Entity "${savedKeyword.word.toUpperCase()}" integrated into "${activeGroup?.name}" surveillance`);
     } catch (e) {
       console.error(e);
+      showToast("Security Breach: Failed to integrate mission target", "error");
     }
   };
 
-  const removeKeyword = async (id: number) => {
+  const removeKeyword = (id: number, word: string) => {
+    setKeywordToDelete({ id, word });
+  };
+
+  const confirmRemoveKeyword = async () => {
+    if (!keywordToDelete) return;
+    const { id, word } = keywordToDelete;
     try {
       await fetch(`/api/keywords?id=${id}`, { method: 'DELETE' });
       setGroups(groups.map(g => {
@@ -331,8 +397,11 @@ export default function Home() {
         }
         return g;
       }));
+      setKeywordToDelete(null);
+      showToast(`Entity "${word.toUpperCase()}" decoupled from "${activeGroup?.name}" monitoring`, "info");
     } catch (e) {
       console.error(e);
+      showToast("Security Breach: Failed to decouple target", "error");
     }
   };
 
@@ -341,19 +410,22 @@ export default function Home() {
       <div className="bg-blob-1" />
       <div className="bg-blob-2" />
       {/* Premium Navigation */}
-      <nav className="glass fixed top-0 left-0 right-0 z-50 px-6 py-4 fade-in">
+      <nav className="glass fixed top-0 left-0 right-0 z-50 px-4 py-3 fade-in">
         <div className="nav-container mx-auto">
           <motion.div 
             initial={{ x: -20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             className="flex items-center gap-3"
           >
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden">
-              <img src="/icon-192x192.png" alt="NewsPulse Logo" className="w-full h-full object-cover" />
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-accent/20 rounded-xl blur-md group-hover:bg-accent/30 transition-all animate-pulse-slow" />
+              <div className="relative w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden border border-white/10 glass-light">
+                <img src="/icon-192x192.png" alt="NewsPulse Logo" className="w-full h-full object-cover" />
+              </div>
             </div>
             <div className="flex flex-col">
-              <h1 className="text-lg font-black tracking-tighter leading-none">NEWSPULSE</h1>
-              <span className="text-[10px] font-bold text-accent tracking-[.2em] uppercase">Smart News Tracker</span>
+              <h1 className="text-lg font-black tracking-tighter leading-none bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">NEWSPULSE</h1>
+              <span className="text-[9px] font-black text-accent tracking-[.3em] uppercase opacity-80">Smart News Tracker</span>
             </div>
           </motion.div>
           
@@ -370,7 +442,7 @@ export default function Home() {
 
       {/* RENDER CONTENT BASED ON TAB */}
       {activeTab === 'home' && (
-        <div className="pt-28 px-4 sm:px-6 w-full max-w-[720px] mx-auto flex flex-col gap-6 fade-in">
+        <div className="pt-24 px-4 sm:px-6 w-full max-w-[720px] mx-auto flex flex-col gap-6 fade-in">
         
         {/* Horizontal Channel Bar */}
         <section className="flex flex-col gap-6">
@@ -463,12 +535,12 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             className="flex flex-col gap-8"
           >
-            <div className="card-rich p-8 sm:p-14 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+            <div className="card-rich p-6 sm:p-10 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
                 <Hash size={140} strokeWidth={4} />
               </div>
               
-              <div className="relative z-10 flex flex-col gap-10">
+              <div className="relative z-10 flex flex-col gap-8 sm:gap-10">
                 <div className="flex items-start justify-between">
                   <div className="flex flex-col gap-4">
                     <div className="flex flex-wrap items-center gap-2">
@@ -478,7 +550,7 @@ export default function Home() {
                         <span>{LANGUAGES.find(l => l.code === (activeGroup.language || 'any'))?.name}</span>
                       </div>
                     </div>
-                    <h3 className="text-4xl sm:text-5xl font-black uppercase tracking-tighter italic break-words leading-[0.9]">{activeGroup.name}</h3>
+                    <h3 className="text-4xl sm:text-5xl font-black uppercase tracking-tighter italic break-all leading-[0.9]">{activeGroup.name}</h3>
                   </div>
                   <button 
                     onClick={() => setGroupToDelete(activeGroup.id)} 
@@ -489,7 +561,7 @@ export default function Home() {
                 </div>
 
                 {/* Per-Channel Automation Settings */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white/5 p-6 rounded-[28px] border border-white/5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white/5 p-4 rounded-[28px] border border-white/5">
                    <div className="flex items-center justify-between">
                       <div className="flex flex-col">
                         <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Auto Alerts</span>
@@ -514,7 +586,7 @@ export default function Home() {
                         <select 
                           value={activeGroup.refreshInterval}
                           onChange={(e) => updateGroupSetting(activeGroup.id, { refreshInterval: parseInt(e.target.value) })}
-                          className="bg-black/40 border border-white/10 rounded-xl pl-3 pr-10 py-1.5 text-[10px] font-black text-white outline-none cursor-pointer appearance-none hover:border-white/20 transition-all"
+                          className="bg-black/40 border border-white/10 rounded-xl pl-3 pr-10 h-8 text-[10px] font-black text-white outline-none cursor-pointer appearance-none hover:border-white/20 transition-all flex items-center"
                         >
                           {INTERVAL_OPTIONS.map(opt => (
                             <option key={opt.value} value={opt.value} className="bg-[#121214]">{opt.label}</option>
@@ -538,7 +610,7 @@ export default function Home() {
                   </motion.div>
                 )}
 
-                <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-4 sm:gap-6">
                   <div className="flex gap-3">
                     <input 
                       type="text" 
@@ -553,23 +625,27 @@ export default function Home() {
                     </button>
                   </div>
 
-                  <div className="flex flex-wrap gap-3">
-                    {activeGroup.keywords.map(kw => (
-                      <motion.div 
-                        layout
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        key={kw.id}
-                        className="bg-accent/5 border border-accent/20 rounded-2xl px-5 py-2.5 flex items-center gap-3 transition-colors hover:border-accent/40"
-                      >
-                        <span className="text-xs font-black text-accent tracking-tight">{kw.word.toUpperCase()}</span>
-                        <X size={16} className="text-accent/40 cursor-pointer hover:text-white" onClick={() => removeKeyword(kw.id)} />
-                      </motion.div>
-                    ))}
-                  </div>
+                  {activeGroup.keywords.length > 0 && (
+                    <div className="flex flex-wrap gap-3">
+                      {activeGroup.keywords.map(kw => (
+                        <motion.div 
+                          layout
+                          initial={{ scale: 0.8, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          key={kw.id}
+                          className="bg-accent/5 border border-accent/20 rounded-2xl px-5 py-2.5 flex items-center gap-3 transition-colors hover:border-accent/40"
+                        >
+                          <span className="text-xs font-black text-accent tracking-tight break-all">{kw.word.toUpperCase()}</span>
+                          <X size={16} className="text-accent/40 cursor-pointer hover:text-white flex-shrink-0" onClick={() => removeKeyword(kw.id, kw.word)} />
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-10 border-t border-white/5 mt-4 gap-8">
+                <div className={`flex flex-col sm:flex-row items-stretch sm:items-center justify-between border-t border-white/5 gap-8 ${
+                  activeGroup.keywords.length > 0 ? 'pt-5 mt-0' : 'pt-4 mt-0'
+                }`}>
                   <div className="flex items-center gap-4">
                     <div className="flex flex-col gap-2">
                       <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Source Localization</span>
@@ -670,22 +746,22 @@ export default function Home() {
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
                     
-                    <div className="absolute top-6 left-6 flex gap-2">
+                    <div className="absolute top-4 left-4 flex gap-2">
                       <div className="badge glass bg-black/40 text-[9px]">
                         {article.source}
                       </div>
                     </div>
                   </div>
                   
-                  <div className="p-10 pb-4 flex flex-col gap-3">
+                  <div className="p-6 pb-2 flex flex-col gap-3">
                     <div className="flex items-center gap-2 text-[10px] font-bold text-white/40 uppercase tracking-widest">
-                       <Clock size={12} /> {new Date(article.publishedAt).toLocaleDateString()} • {new Date(article.publishedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                       <Clock size={12} className="text-accent/60" /> {formatTime(article.publishedAt)}
                     </div>
-                    <h3 className="text-2xl font-black leading-tight tracking-tight group-hover:text-accent transition-colors">{article.title}</h3>
+                    <h3 className="text-xl sm:text-2xl font-black leading-tight tracking-tight group-hover:text-accent transition-colors">{article.title}</h3>
                     <p className="text-sm text-white/50 line-clamp-2 leading-relaxed">{article.description}</p>
                   </div>
                   
-                  <div className="px-10 py-6 flex items-center justify-between border-t border-white/5 mt-2">
+                  <div className="px-6 py-4 flex items-center justify-between border-t border-white/5 mt-2">
                     <span className="text-[10px] font-black text-accent uppercase tracking-widest">Secure Link Available</span>
                     <ChevronRight size={18} className="text-accent transform group-hover:translate-x-1 transition-transform" />
                   </div>
@@ -828,7 +904,7 @@ export default function Home() {
                         <div className="flex flex-col">
                           <span className="font-black text-sm tracking-tight text-white/90">PIPELINE SYNC</span>
                           <span className={`text-[9px] font-bold uppercase tracking-widest ${isGlobalSyncEnabled ? 'text-accent' : 'text-white/20'}`}>
-                             {isGlobalSyncEnabled ? (isScanning ? 'Scanning...' : 'Active') : 'Standby'}
+                             {isGlobalSyncEnabled ? (isScanning ? 'Synchronizing Intelligence...' : 'Active') : 'Standby'}
                           </span>
                         </div>
                       </div>
@@ -886,7 +962,7 @@ export default function Home() {
                 onClick={() => setShowSettings(false)} 
                 className="button-primary py-4 mt-2 text-sm font-black uppercase italic tracking-tighter flex-shrink-0"
               >
-                Close Panel
+                Close
               </button>
             </motion.div>
           </motion.div>
@@ -916,7 +992,7 @@ export default function Home() {
               <div className="flex flex-col gap-2 text-center">
                 <h3 className="text-xl font-black uppercase italic tracking-tighter">Destroy Channel?</h3>
                 <p className="text-sm text-white/40 leading-relaxed">
-                  Are you sure you want to delete <span className="text-white font-bold">"{groups.find(g => g.id === groupToDelete)?.name}"</span>? This action is irreversible.
+                  Are you sure you want to delete <span className="text-white font-bold break-all">"{groups.find(g => g.id === groupToDelete)?.name}"</span>? This action is irreversible.
                 </p>
               </div>
 
@@ -935,6 +1011,68 @@ export default function Home() {
                 </button>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Premium Keyword Delete Confirmation Modal */}
+      <AnimatePresence>
+        {keywordToDelete && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-xl"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="card max-w-[400px] w-full bg-gradient-to-br from-[#1a1b26] to-[#0a0b12] border-accent/20 p-8 flex flex-col gap-6"
+            >
+              <div className="w-20 h-20 rounded-[32px] bg-accent/10 flex items-center justify-center border border-accent/20 mx-auto">
+                <Settings size={40} className="text-accent" />
+              </div>
+              
+              <div className="flex flex-col gap-2 text-center">
+                <h3 className="text-xl font-black uppercase italic tracking-tighter">Destroy Keyword?</h3>
+                <p className="text-sm text-white/40 leading-relaxed">
+                  Are you sure you want to remove <span className="text-white font-bold break-all">"{keywordToDelete.word.toUpperCase()}"</span>? This target will no longer be tracked.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={confirmRemoveKeyword}
+                  className="w-full bg-error text-white font-black py-4 rounded-xl hover:bg-error/80 transition-all uppercase tracking-widest text-xs"
+                >
+                  Confirm Destroy
+                </button>
+                <button 
+                  onClick={() => setKeywordToDelete(null)}
+                  className="w-full bg-white/5 text-white/40 font-black py-4 rounded-xl hover:bg-white/10 transition-all uppercase tracking-widest text-xs"
+                >
+                  Abort
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Premium Toast Notification System */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            className={`fixed bottom-24 sm:bottom-10 left-1/2 -translate-x-1/2 z-[250] px-6 py-3 rounded-full shadow-2xl border backdrop-blur-xl flex items-center gap-3 ${
+              toast.type === 'success' ? 'bg-accent/20 border-accent/40 text-accent' : 
+              toast.type === 'error' ? 'bg-error/20 border-error/40 text-error' : 
+              'bg-white/10 border-white/20 text-white'
+            }`}
+          >
+            <span className="text-xs font-black uppercase tracking-widest">{toast.message}</span>
           </motion.div>
         )}
       </AnimatePresence>
