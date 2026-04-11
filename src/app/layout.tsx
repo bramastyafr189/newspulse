@@ -40,9 +40,28 @@ export default function RootLayout({
                 window.addEventListener('load', function() {
                   navigator.serviceWorker.register('/sw.js').then(function(registration) {
                     console.log('ServiceWorker registration successful');
+                    
+                    // Listen for updates
+                    registration.onupdatefound = () => {
+                      const newWorker = registration.installing;
+                      newWorker.onstatechange = () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                          // New version available!
+                          console.log('New content is available; please refresh.');
+                        }
+                      };
+                    };
                   }, function(err) {
                     console.log('ServiceWorker registration failed');
                   });
+                });
+
+                // Refresh the page once the new service worker has taken control
+                let refreshing = false;
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                  if (refreshing) return;
+                  refreshing = true;
+                  window.location.reload();
                 });
               }
             `,
