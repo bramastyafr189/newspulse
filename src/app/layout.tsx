@@ -1,5 +1,6 @@
 import "./globals.css";
 import { Outfit } from "next/font/google";
+import Script from "next/script";
 
 const outfit = Outfit({ subsets: ["latin"] });
 
@@ -30,7 +31,9 @@ export default function RootLayout({
     <html lang="en" className={outfit.className}>
       <body>
         {children}
-        <script
+        <Script
+          id="sw-registration"
+          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               if ('serviceWorker' in navigator) {

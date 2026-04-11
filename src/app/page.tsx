@@ -75,6 +75,8 @@ export default function Home() {
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [groupToDelete, setGroupToDelete] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'home' | 'explore' | 'account'>('home');
+  const [isGlobalSyncEnabled, setIsGlobalSyncEnabled] = useState(true);
+  const [isScanning, setIsScanning] = useState(false);
 
   const groupsRef = useRef<InterestGroup[]>([]);
 
@@ -107,7 +109,18 @@ export default function Home() {
     if ("Notification" in window) {
       setNotificationsAllowed(Notification.permission === "granted");
     }
+    
+    // Load global sync preference
+    const savedSync = localStorage.getItem('newspulse_global_sync');
+    if (savedSync !== null) {
+      setIsGlobalSyncEnabled(savedSync === 'true');
+    }
   }, [loadData]);
+
+  const toggleGlobalSync = (enabled: boolean) => {
+    setIsGlobalSyncEnabled(enabled);
+    localStorage.setItem('newspulse_global_sync', String(enabled));
+  };
 
   const activeGroup = groups.find(g => g.id === activeGroupId);
 
@@ -176,7 +189,11 @@ export default function Home() {
   // Background Polling Logic: Ensures news is always fresh and alerts are sent
   useEffect(() => {
     const pollInterval = setInterval(async () => {
+      // 1. Check Global Master Switch
+      if (!isGlobalSyncEnabled) return;
+
       const now = new Date();
+      let scanPerformed = false;
       
       for (const group of groupsRef.current) {
         // Skip if alerts are off (to save API quota), or no keywords/interval defined
@@ -186,6 +203,11 @@ export default function Home() {
         const diffMinutes = (now.getTime() - lastScan.getTime()) / (1000 * 60);
 
         if (diffMinutes >= group.refreshInterval) {
+          if (!scanPerformed) {
+             scanPerformed = true;
+             setIsScanning(true);
+          }
+
           console.log(`[Auto-Scan] Processing: ${group.name}`);
           const fetchedNews = await handleFetch(
             group.keywords.map(k => k.word),
@@ -206,10 +228,14 @@ export default function Home() {
           }
         }
       }
+
+      if (scanPerformed) {
+        setTimeout(() => setIsScanning(false), 3000); // Visual feedback duration
+      }
     }, 60000); // Pulse check every minute
 
     return () => clearInterval(pollInterval);
-  }, [activeGroupId]); // Re-run if active group id changes (to sync loading states correctly)
+  }, [activeGroupId, isGlobalSyncEnabled]); // Re-run if global sync changes
 
   const createGroup = async () => {
     if (!newGroupName.trim()) return;
@@ -794,26 +820,40 @@ export default function Home() {
                   </div>
 
                   <div className="card bg-white/5 border-white/5 p-4 flex flex-col gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 rounded-xl bg-accent/20 text-accent">
-                        <Volume2 size={18} />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-3 rounded-xl transition-colors ${isGlobalSyncEnabled ? 'bg-accent/20 text-accent' : 'bg-white/5 text-white/20'}`}>
+                          <Volume2 size={18} />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-black text-sm tracking-tight text-white/90">PIPELINE SYNC</span>
+                          <span className={`text-[9px] font-bold uppercase tracking-widest ${isGlobalSyncEnabled ? 'text-accent' : 'text-white/20'}`}>
+                             {isGlobalSyncEnabled ? (isScanning ? 'Scanning...' : 'Active') : 'Standby'}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex flex-col">
-                        <span className="font-black text-sm tracking-tight text-white/90">PIPELINE SYNC</span>
-                        <span className="text-[9px] font-bold text-accent uppercase tracking-widest">Active</span>
-                      </div>
+                      <button 
+                        onClick={() => toggleGlobalSync(!isGlobalSyncEnabled)}
+                        className={`w-12 h-7 rounded-full relative transition-all duration-300 ${isGlobalSyncEnabled ? 'bg-accent/40 border-accent/20' : 'bg-white/5 border-white/5'} border`}
+                      >
+                         <motion.div 
+                           animate={{ x: isGlobalSyncEnabled ? 22 : 4 }}
+                           className={`absolute top-1 w-4 h-4 rounded-full shadow-lg ${isGlobalSyncEnabled ? 'bg-white' : 'bg-white/20'}`} 
+                         />
+                      </button>
                     </div>
                     <div className="h-1 bg-white/5 rounded-full relative overflow-hidden">
                       <motion.div 
+                        initial={false}
                         animate={{ 
-                          x: ["-100%", "100%"]
+                          x: isScanning ? ["-100%", "100%"] : "-100%"
                         }}
-                        transition={{ 
-                          duration: 2, 
+                        transition={isScanning ? { 
+                          duration: 1.5, 
                           repeat: Infinity,
-                          ease: "easeInOut" 
-                        }}
-                        className="h-full w-1/2 bg-accent rounded-full"
+                          ease: "linear" 
+                        } : { duration: 0.5 }}
+                        className="h-full w-1/2 bg-accent rounded-full shadow-[0_0_10px_var(--accent)]"
                       />
                     </div>
                   </div>
