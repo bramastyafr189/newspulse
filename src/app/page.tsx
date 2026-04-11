@@ -352,8 +352,8 @@ export default function Home() {
               <img src="/icon-192x192.png" alt="NewsPulse Logo" className="w-full h-full object-cover" />
             </div>
             <div className="flex flex-col">
-              <h1 className="text-lg font-black tracking-tighter leading-none">NEWS</h1>
-              <span className="text-[10px] font-bold text-accent tracking-[.2em] uppercase">PULSE</span>
+              <h1 className="text-lg font-black tracking-tighter leading-none">NEWSPULSE</h1>
+              <span className="text-[10px] font-bold text-accent tracking-[.2em] uppercase">Smart News Tracker</span>
             </div>
           </motion.div>
           
