@@ -24,7 +24,17 @@ import {
   Compass,
   User,
   ChevronDown,
-  Calendar
+  Calendar,
+  Radio,
+  Satellite,
+  Terminal,
+  Activity,
+  Cpu,
+  Radar,
+  Rocket,
+  Shield,
+  Target,
+  Wifi
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { fetchNews, NewsArticle } from "@/lib/news";
@@ -67,6 +77,16 @@ interface InterestGroup {
   keywords: { id: number; word: string }[];
 }
 
+const CHANNEL_ICONS = [Hash, Globe, Activity, Cpu, Radar, Shield, Rocket, Target, Wifi, Radio, Satellite, Terminal];
+
+const getChannelIcon = (name: string) => {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return CHANNEL_ICONS[Math.abs(hash) % CHANNEL_ICONS.length];
+};
+
 const LANGUAGES = [
   { code: 'any', name: 'Global (All)', flag: '🌐' },
   { code: 'en', name: 'English', flag: '🇺🇸' },
@@ -89,13 +109,75 @@ const INTERVAL_OPTIONS = [
   { value: 720, label: '12 Hours' },
 ];
 
+function useDragScroll() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    if (!ref.current) return;
+    setIsDragging(true);
+    setStartX(e.pageX - ref.current.offsetLeft);
+    setScrollLeft(ref.current.scrollLeft);
+  };
+  const onMouseLeave = () => setIsDragging(false);
+  const onMouseUp = () => setIsDragging(false);
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !ref.current) return;
+    e.preventDefault();
+    const x = e.pageX - ref.current.offsetLeft;
+    const walk = (x - startX) * 2;
+    ref.current.scrollLeft = scrollLeft - walk;
+  };
+
+  return {
+    ref,
+    onMouseDown,
+    onMouseLeave,
+    onMouseUp,
+    onMouseMove,
+    className: `overflow-x-auto scrollbar-hide ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`,
+  };
+}
+
 export default function Home() {
   const [groups, setGroups] = useState<InterestGroup[]>([]);
   const [activeGroupId, setActiveGroupId] = useState<number | null>(null);
+  const channelScroll = useDragScroll();
+  const filterScroll = useDragScroll();
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupLang, setNewGroupLang] = useState("any");
   const [newKeyword, setNewKeyword] = useState("");
   const [news, setNews] = useState<NewsArticle[]>([]);
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [isNavVisible, setIsNavVisible] = useState(true);
+
+  useEffect(() => {
+    let lastScrollY = window.scrollY;
+    let ticking = false;
+
+    const updateScrollDir = () => {
+      const scrollY = window.scrollY;
+      if (Math.abs(scrollY - lastScrollY) < 10) {
+        ticking = false;
+        return;
+      }
+      setIsNavVisible(scrollY < lastScrollY || scrollY < 50);
+      lastScrollY = scrollY > 0 ? scrollY : 0;
+      ticking = false;
+    };
+
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(updateScrollDir);
+        ticking = true;
+      }
+    };
+
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
   
   const [notificationsAllowed, setNotificationsAllowed] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -160,6 +242,8 @@ export default function Home() {
   };
 
   const activeGroup = groups.find(g => g.id === activeGroupId);
+  const uniqueSources = Array.from(new Set(news.map(n => n.source))).filter(Boolean).sort();
+  const filteredNews = sourceFilter === "all" ? news : news.filter(n => n.source === sourceFilter);
 
   const requestNotificationPermission = async () => {
     if (!("Notification" in window)) return;
@@ -191,7 +275,10 @@ export default function Home() {
     if (groupId === activeGroupId) setLoading(true);
     try {
       const data = await fetchNews(keywords, lang, country);
-      if (groupId === activeGroupId) setNews(data);
+      if (groupId === activeGroupId) {
+        setNews(data);
+        setSourceFilter("all");
+      }
       
       // Update lastScanAt in DB
       if (groupId) {
@@ -410,7 +497,12 @@ export default function Home() {
       <div className="bg-blob-1" />
       <div className="bg-blob-2" />
       {/* Premium Navigation */}
-      <nav className="glass fixed top-0 left-0 right-0 z-50 px-4 py-3 fade-in">
+      <motion.nav 
+        initial={{ y: 0 }}
+        animate={{ y: isNavVisible ? 0 : "-100%" }}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
+        className="glass fixed top-0 left-0 right-0 z-50 px-4 py-3"
+      >
         <div className="nav-container mx-auto">
           <motion.div 
             initial={{ x: -20, opacity: 0 }}
@@ -438,9 +530,9 @@ export default function Home() {
             </button>
           </div>
         </div>
-      </nav>
+      </motion.nav>
 
-      {/* RENDER CONTENT BASED ON TAB */}
+      {/* Main Content Areas */}
       {activeTab === 'home' && (
         <div className="pt-24 px-4 sm:px-6 w-full max-w-[720px] mx-auto flex flex-col gap-6 fade-in">
         
@@ -456,7 +548,14 @@ export default function Home() {
             </button>
           </div>
 
-          <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide -mx-1 px-1">
+          <div 
+            className={`flex gap-3 pb-4 -mx-1 px-1 ${channelScroll.className}`}
+            ref={channelScroll.ref}
+            onMouseDown={channelScroll.onMouseDown}
+            onMouseLeave={channelScroll.onMouseLeave}
+            onMouseUp={channelScroll.onMouseUp}
+            onMouseMove={channelScroll.onMouseMove}
+          >
             {groups.map(group => (
               <motion.button
                 key={group.id}
@@ -472,7 +571,10 @@ export default function Home() {
                   ? 'bg-accent border-accent shadow-xl shadow-accent/30' 
                   : 'bg-white/5 border-transparent hover:border-white/10'
                 }`}>
-                  <Hash size={24} className={activeGroupId === group.id ? 'text-white' : 'text-white/20 group-hover:text-white/40'} />
+                  {(() => {
+                    const IconObj = getChannelIcon(group.name);
+                    return <IconObj size={24} className={activeGroupId === group.id ? 'text-white' : 'text-white/20 group-hover:text-white/40'} />;
+                  })()}
                 </div>
                 {group.notificationsEnabled && (
                   <div className="absolute top-0 right-0 w-3 h-3 bg-accent-secondary rounded-full border-2 border-background animate-pulse" />
@@ -537,7 +639,10 @@ export default function Home() {
           >
             <div className="card-rich p-6 sm:p-10 relative overflow-hidden group">
               <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-                <Hash size={140} strokeWidth={4} />
+                {(() => {
+                    const IconObj = getChannelIcon(activeGroup.name);
+                    return <IconObj size={140} strokeWidth={4} />;
+                })()}
               </div>
               
               <div className="relative z-10 flex flex-col gap-8 sm:gap-10">
@@ -663,14 +768,15 @@ export default function Home() {
                       </div>
                     </div>
                   </div>
-                  <button 
-                    onClick={triggerManualFetch} 
-                    className="button-primary flex items-center gap-4 group/btn py-5 px-10 shadow-2xl"
-                    disabled={activeGroup.keywords.length === 0}
-                  >
-                    <Search size={22} className="group-hover/btn:rotate-12 transition-transform" />
-                    <span className="text-xs uppercase tracking-[0.2em] font-black italic">Scan Pipeline</span>
-                  </button>
+                  {activeGroup.keywords.length > 0 && (
+                    <button 
+                      onClick={triggerManualFetch} 
+                      className="button-primary flex items-center gap-4 group/btn py-5 px-10 shadow-2xl"
+                    >
+                      <Search size={22} className="group-hover/btn:rotate-12 transition-transform" />
+                      <span className="text-xs uppercase tracking-[0.2em] font-black italic">Scan Pipeline</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -713,22 +819,60 @@ export default function Home() {
               </div>
             </div>
           ) : news.length > 0 ? (
-            <div className="grid grid-cols-1 gap-8">
-              {news.map((article, i) => (
+            <div className="flex flex-col gap-6">
+              {uniqueSources.length > 1 && (
+                <div 
+                  className={`flex items-center gap-3 pb-2 -mx-1 px-1 ${filterScroll.className}`}
+                  ref={filterScroll.ref}
+                  onMouseDown={filterScroll.onMouseDown}
+                  onMouseLeave={filterScroll.onMouseLeave}
+                  onMouseUp={filterScroll.onMouseUp}
+                  onMouseMove={filterScroll.onMouseMove}
+                >
+                 <button 
+                   onClick={() => setSourceFilter("all")} 
+                   className={`flex-shrink-0 px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${sourceFilter === 'all' ? 'bg-accent/20 border-accent/40 text-accent' : 'bg-white/5 border-transparent text-white/40 hover:bg-white/10 hover:text-white/80'}`}
+                 >
+                   ALL SOURCES
+                 </button>
+                 {uniqueSources.map(source => (
+                   <button 
+                     key={source}
+                     onClick={() => setSourceFilter(source)}
+                     className={`flex-shrink-0 px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${sourceFilter === source ? 'bg-accent/20 border-accent/40 text-accent' : 'bg-white/5 border-transparent text-white/40 hover:bg-white/10 hover:text-white/80'}`}
+                   >
+                     {source}
+                   </button>
+                 ))}
+                </div>
+              )}
+              <div className="flex flex-col gap-3">
+                {filteredNews.map((article, i) => (
                 <motion.div 
                   key={article.id}
-                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  initial={{ opacity: 0, scale: 0.98, x: -10 }}
+                  animate={{ opacity: 1, scale: 1, x: 0 }}
                   transition={{ 
-                    duration: 0.4,
-                    delay: i * 0.04,
+                    duration: 0.3,
+                    delay: i * 0.03,
                     ease: "easeOut"
                   }}
-                  className="card-rich group cursor-pointer"
+                  className="card-rich group cursor-pointer p-5 sm:p-6 flex gap-5 items-start relative overflow-hidden pr-8 sm:pr-14"
                   onClick={() => window.open(article.url, '_blank')}
                 >
-                  <div className="relative aspect-video overflow-hidden">
-                    {article.image ? (
+                  <div className="flex-1 flex flex-col gap-2 min-w-0 z-10">
+                    <div className="flex items-center flex-wrap gap-2 text-[10px] font-bold text-white/40 uppercase tracking-widest leading-none">
+                       <Clock size={12} className="text-accent/60 flex-shrink-0" /> 
+                       <span>{formatTime(article.publishedAt)}</span>
+                       <span className="w-1 h-1 rounded-full bg-white/20" />
+                       <span className="text-white/80">{article.source}</span>
+                    </div>
+                    <h3 className="text-[17px] sm:text-xl font-black leading-[1.2] tracking-tight group-hover:text-accent transition-colors">{article.title}</h3>
+                    <p className="text-xs sm:text-sm text-white/50 line-clamp-2 leading-relaxed">{article.description}</p>
+                  </div>
+                  
+                  {article.image && (
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden flex-shrink-0 border border-white/10 z-10 hidden sm:block">
                       <img 
                         src={article.image} 
                         loading="lazy"
@@ -739,34 +883,14 @@ export default function Home() {
                           target.style.display = 'none';
                         }}
                       />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-accent/20 to-purple-900/40 flex items-center justify-center">
-                         <Globe size={40} className="text-white/10" />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
-                    
-                    <div className="absolute top-4 left-4 flex gap-2">
-                      <div className="badge glass bg-black/40 text-[9px]">
-                        {article.source}
-                      </div>
                     </div>
-                  </div>
+                  )}
                   
-                  <div className="p-6 pb-2 flex flex-col gap-3">
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-white/40 uppercase tracking-widest">
-                       <Clock size={12} className="text-accent/60" /> {formatTime(article.publishedAt)}
-                    </div>
-                    <h3 className="text-xl sm:text-2xl font-black leading-tight tracking-tight group-hover:text-accent transition-colors">{article.title}</h3>
-                    <p className="text-sm text-white/50 line-clamp-2 leading-relaxed">{article.description}</p>
-                  </div>
-                  
-                  <div className="px-6 py-4 flex items-center justify-between border-t border-white/5 mt-2">
-                    <span className="text-[10px] font-black text-accent uppercase tracking-widest">Secure Link Available</span>
-                    <ChevronRight size={18} className="text-accent transform group-hover:translate-x-1 transition-transform" />
-                  </div>
+                  {/* Subtle right chevron indicating it's a clickable link */}
+                  <ChevronRight size={20} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/5 group-hover:text-accent transform group-hover:translate-x-1 transition-all" />
                 </motion.div>
               ))}
+              </div>
             </div>
           ) : (
             <div className="py-24 px-8 flex flex-col items-center gap-8 text-center bg-white/5 rounded-[48px] border border-dashed border-white/10">
@@ -818,7 +942,12 @@ export default function Home() {
       )}
 
       {/* Premium Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#050507]/90 backdrop-blur-3xl border-t border-white/10 pb-safe pb-4 sm:pb-6 pt-4 px-6 flex items-center justify-center fade-in">
+      <motion.nav 
+        initial={{ y: 0 }}
+        animate={{ y: isNavVisible ? 0 : "100%" }}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
+        className="fixed bottom-0 left-0 right-0 z-40 bg-[#050507]/90 backdrop-blur-3xl border-t border-white/10 pb-safe pb-4 sm:pb-6 pt-4 px-6 flex items-center justify-center"
+      >
         <div className="flex items-center gap-12 sm:gap-24">
            <button 
              onClick={() => setActiveTab('home')}
@@ -842,7 +971,7 @@ export default function Home() {
              <span className="text-[9px] font-black uppercase tracking-widest">Account</span>
            </button>
         </div>
-      </nav>
+      </motion.nav>
 
       {/* Modern tray Settings */}
       <AnimatePresence>
@@ -859,21 +988,40 @@ export default function Home() {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="bg-[#0a0a0c] w-full max-w-2xl rounded-t-[48px] p-6 sm:p-8 border border-white/10 border-b-0 flex flex-col gap-5 max-h-[85vh] overflow-y-auto no-scrollbar shadow-2xl"
+              drag="y"
+              dragConstraints={{ top: 0 }}
+              dragElastic={{ top: 0, bottom: 0.5 }}
+              onDragEnd={(e, info) => {
+                if (info.offset.y > 100 || info.velocity.y > 500) {
+                  setShowSettings(false);
+                }
+              }}
+              className="bg-[#0a0a0c] w-full max-w-2xl rounded-t-[48px] border border-white/10 border-b-0 flex flex-col shadow-2xl"
               onClick={e => e.stopPropagation()}
             >
-              <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-2 flex-shrink-0" />
-              <div className="flex items-center justify-between flex-shrink-0">
-                <div className="flex flex-col">
-                  <h3 className="text-2xl font-black italic uppercase tracking-tighter">System Config</h3>
-                  <p className="text-xs text-white/30 hidden sm:block">Application control panel</p>
+              {/* Draggable Handle and Header Area */}
+              <div className="pt-6 sm:pt-8 pb-5 px-6 sm:px-8 flex-shrink-0 cursor-grab active:cursor-grabbing w-full flex flex-col gap-5 rounded-t-[48px]">
+                <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto flex-shrink-0" />
+                <div className="flex items-center justify-between flex-shrink-0">
+                  <div className="flex flex-col cursor-default">
+                    <h3 className="text-2xl font-black italic uppercase tracking-tighter">System Config</h3>
+                    <p className="text-xs text-white/30 hidden sm:block">Application control panel</p>
+                  </div>
+                  <button 
+                    onClick={() => setShowSettings(false)} 
+                    onPointerDownCapture={e => e.stopPropagation()} // Exclude from drag
+                    className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center flex-shrink-0 hover:bg-white/10 transition-all"
+                  >
+                    <X size={18} />
+                  </button>
                 </div>
-                <button onClick={() => setShowSettings(false)} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center flex-shrink-0 hover:bg-white/10 transition-all">
-                  <X size={18} />
-                </button>
               </div>
 
-              <div className="flex flex-col sm:grid sm:grid-cols-2 gap-4 flex-1">
+              {/* Scrollable Content Area (Excluded from Drag) */}
+              <div 
+                className="px-6 sm:px-8 pb-6 sm:pb-8 flex flex-col sm:grid sm:grid-cols-2 gap-4 flex-1 max-h-[70vh] overflow-y-auto no-scrollbar"
+                onPointerDownCapture={e => e.stopPropagation()}
+              >
                 {/* Column 1: Alerts & Sync */}
                 <div className="flex flex-col gap-4">
                   <div className="card bg-white/5 border-white/5 p-4 flex flex-col gap-4">
