@@ -38,12 +38,13 @@ export async function PATCH(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    const { language, country, refreshInterval, notificationsEnabled, lastScanAt } = await request.json();
+    const { name, language, country, refreshInterval, notificationsEnabled, lastScanAt } = await request.json();
     
     if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     
     await db.update(interests)
       .set({ 
+        name: name !== undefined ? name : undefined,
         language: language !== undefined ? language : undefined,
         country: country !== undefined ? country : undefined,
         refreshInterval: refreshInterval !== undefined ? refreshInterval : undefined,

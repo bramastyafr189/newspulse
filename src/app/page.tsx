@@ -34,10 +34,21 @@ import {
   Rocket,
   Shield,
   Target,
-  Wifi
+  Wifi,
+  Edit2,
+  MoreVertical
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { fetchNews, NewsArticle } from "@/lib/news";
+
+interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  channel: string;
+  timestamp: string;
+  articles?: NewsArticle[];
+}
 
 // Helper for professional time formatting
 const formatTime = (dateStr: string) => {
@@ -152,6 +163,13 @@ export default function Home() {
   const [news, setNews] = useState<NewsArticle[]>([]);
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [isNavVisible, setIsNavVisible] = useState(true);
+  const [historyLogs, setHistoryLogs] = useState<AppNotification[]>([]);
+  const [tickerTime, setTickerTime] = useState(Date.now());
+  const [showClearLogsModal, setShowClearLogsModal] = useState(false);
+  const [isCustomMode, setIsCustomMode] = useState(false);
+  const [isRenamingGroupId, setIsRenamingGroupId] = useState<number | null>(null);
+  const [editGroupName, setEditGroupName] = useState("");
+  const [showActionMenu, setShowActionMenu] = useState(false);
 
   useEffect(() => {
     let lastScrollY = window.scrollY;
@@ -178,6 +196,32 @@ export default function Home() {
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  // Initialize logs from local storage
+  useEffect(() => {
+    const saved = localStorage.getItem('newspulse_logs');
+    if (saved) {
+      try {
+        setHistoryLogs(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to parse logs", e);
+      }
+    }
+  }, []);
+
+  // Persist logs to local storage
+  useEffect(() => {
+    localStorage.setItem('newspulse_logs', JSON.stringify(historyLogs));
+  }, [historyLogs]);
+
+  // Real-time ticker for countdown precision
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTickerTime(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   
   const [notificationsAllowed, setNotificationsAllowed] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -275,6 +319,11 @@ export default function Home() {
     if (groupId === activeGroupId) setLoading(true);
     try {
       const data = await fetchNews(keywords, lang, country);
+      
+      const targetGroup = groups.find(g => g.id === groupId);
+      const lastScan = targetGroup?.lastScanAt ? new Date(targetGroup.lastScanAt) : new Date(0);
+      const newArticles = data.filter(a => new Date(a.publishedAt) > lastScan);
+
       if (groupId === activeGroupId) {
         setNews(data);
         setSourceFilter("all");
@@ -288,6 +337,19 @@ export default function Home() {
           body: JSON.stringify({ lastScanAt: now })
         });
         setGroups(prev => prev.map(g => g.id === groupId ? { ...g, lastScanAt: now } : g));
+
+        // Create log entry for intelligence persistence
+        if (newArticles.length > 0) {
+          const newLog: AppNotification = {
+            id: Math.random().toString(36).substr(2, 9),
+            title: `Intelligence Acquired: ${newArticles.length} articles`,
+            body: `Intercepted signals for "${targetGroup?.name || 'Channel'}". Priority: High.`,
+            channel: targetGroup?.name || 'Unknown',
+            timestamp: now,
+            articles: newArticles
+          };
+          setHistoryLogs(prev => [newLog, ...prev].slice(0, 100));
+        }
       }
       
       return data;
@@ -297,6 +359,15 @@ export default function Home() {
     } finally {
       if (groupId === activeGroupId) setLoading(false);
     }
+  };
+
+  const saveRename = async (id: number) => {
+    if (!editGroupName.trim()) {
+      setIsRenamingGroupId(null);
+      return;
+    }
+    await updateGroupSetting(id, { name: editGroupName.trim() });
+    setIsRenamingGroupId(null);
   };
 
   const triggerManualFetch = () => {
@@ -356,7 +427,7 @@ export default function Home() {
       if (scanPerformed) {
         setTimeout(() => setIsScanning(false), 3000); // Visual feedback duration
       }
-    }, 60000); // Pulse check every minute
+    }, 10000); // Pulse check every 10 seconds for precise monitoring
 
     return () => clearInterval(pollInterval);
   }, [activeGroupId, isGlobalSyncEnabled]); // Re-run if global sync changes
@@ -657,12 +728,56 @@ export default function Home() {
                     </div>
                     <h3 className="text-4xl sm:text-5xl font-black uppercase tracking-tighter italic break-all leading-[0.9]">{activeGroup.name}</h3>
                   </div>
-                  <button 
-                    onClick={() => setGroupToDelete(activeGroup.id)} 
-                    className="w-12 h-12 rounded-2xl bg-white/5 flex-shrink-0 flex items-center justify-center hover:bg-error/20 hover:text-error transition-all border border-white/5"
-                  >
-                    <Trash2 size={20} />
-                  </button>
+                  <div className="relative flex-shrink-0">
+                    <button 
+                      onClick={() => setShowActionMenu(!showActionMenu)} 
+                      className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all border border-white/5 shadow-xl ${
+                        showActionMenu ? 'bg-accent text-white border-accent' : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      <MoreVertical size={20} />
+                    </button>
+
+                    <AnimatePresence>
+                      {showActionMenu && (
+                        <>
+                          <div 
+                            className="fixed inset-0 z-10" 
+                            onClick={() => setShowActionMenu(false)} 
+                          />
+                          <motion.div 
+                            initial={{ opacity: 0, scale: 0.9, y: -10, x: 10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: -10, x: 10 }}
+                            className="absolute right-0 top-14 w-48 bg-[#1a1b26]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl z-20 overflow-hidden flex flex-col p-1.5"
+                          >
+                             <button 
+                               onClick={() => {
+                                 setShowActionMenu(false);
+                                 setEditGroupName(activeGroup.name);
+                                 setIsRenamingGroupId(activeGroup.id);
+                               }}
+                               className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 text-xs font-bold text-white/70 hover:text-white transition-all text-left"
+                             >
+                                <Edit2 size={16} className="text-accent" />
+                                <span>Rename Channel</span>
+                             </button>
+                             <div className="h-px bg-white/5 mx-2 my-1" />
+                             <button 
+                               onClick={() => {
+                                 setShowActionMenu(false);
+                                 setGroupToDelete(activeGroup.id);
+                               }}
+                               className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-error/10 text-xs font-bold text-white/50 hover:text-error transition-all text-left"
+                             >
+                                <Trash2 size={16} className="text-error/70" />
+                                <span>Delete Channel</span>
+                             </button>
+                          </motion.div>
+                        </>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
 
                 {/* Per-Channel Automation Settings */}
@@ -685,19 +800,43 @@ export default function Home() {
                    <div className="flex items-center justify-between sm:border-l sm:border-white/10 sm:pl-6">
                       <div className="flex flex-col">
                         <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Interval</span>
-                        <span className="text-xs font-bold text-white uppercase">{INTERVAL_OPTIONS.find(o => o.value === activeGroup.refreshInterval)?.label}</span>
+                        <span className="text-xs font-bold text-white uppercase">
+                           {INTERVAL_OPTIONS.find(o => o.value === activeGroup.refreshInterval)?.label || `${activeGroup.refreshInterval} Mins`}
+                        </span>
                       </div>
-                      <div className="relative">
-                        <select 
-                          value={activeGroup.refreshInterval}
-                          onChange={(e) => updateGroupSetting(activeGroup.id, { refreshInterval: parseInt(e.target.value) })}
-                          className="bg-black/40 border border-white/10 rounded-xl pl-3 pr-10 h-8 text-[10px] font-black text-white outline-none cursor-pointer appearance-none hover:border-white/20 transition-all flex items-center"
-                        >
-                          {INTERVAL_OPTIONS.map(opt => (
-                            <option key={opt.value} value={opt.value} className="bg-[#121214]">{opt.label}</option>
-                          ))}
-                        </select>
-                        <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+                      <div className="flex items-center gap-2">
+                         <div className="relative">
+                           <select 
+                             value={INTERVAL_OPTIONS.some(o => o.value === activeGroup.refreshInterval) ? activeGroup.refreshInterval : "custom"}
+                             onChange={(e) => {
+                               const val = e.target.value;
+                               if (val === "custom") {
+                                 setIsCustomMode(true);
+                               } else {
+                                 setIsCustomMode(false);
+                                 updateGroupSetting(activeGroup.id, { refreshInterval: parseInt(val) });
+                               }
+                             }}
+                             className="bg-black/40 border border-white/10 rounded-xl pl-3 pr-10 h-8 text-[10px] font-black text-white outline-none cursor-pointer appearance-none hover:border-white/20 transition-all flex items-center"
+                           >
+                             {INTERVAL_OPTIONS.map(opt => (
+                               <option key={opt.value} value={opt.value} className="bg-[#121214]">{opt.label}</option>
+                             ))}
+                             <option value="custom" className="bg-[#121214]">Custom...</option>
+                           </select>
+                           <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+                         </div>
+                         {isCustomMode && (
+                           <input 
+                             type="number"
+                             min="1"
+                             autoFocus
+                             placeholder="Mins"
+                             value={activeGroup.refreshInterval === 0 ? '' : activeGroup.refreshInterval}
+                             onChange={(e) => updateGroupSetting(activeGroup.id, { refreshInterval: parseInt(e.target.value) || 0 })}
+                             className="w-16 h-8 bg-black/40 border border-white/10 rounded-xl px-2 text-[10px] font-black text-white outline-none focus:border-accent"
+                           />
+                         )}
                       </div>
                    </div>
                 </div>
@@ -918,25 +1057,160 @@ export default function Home() {
       )}
 
       {activeTab === 'explore' && (
-        <div className="pt-32 px-4 flex flex-col items-center justify-center min-h-[60vh] text-center w-full max-w-[720px] mx-auto gap-6 fade-in">
-          <div className="w-24 h-24 rounded-full border border-white/10 bg-white/5 flex flex-col gap-2 items-center justify-center">
-             <Compass size={40} className="text-white/20" />
+        <div className="pt-24 px-4 sm:px-6 w-full max-w-[720px] mx-auto flex flex-col gap-6 fade-in pb-20">
+          <div className="flex items-center justify-between px-2">
+            <h2 className="text-[11px] font-black uppercase tracking-[0.2em] text-white/30">Monitoring Hub</h2>
+            <div className="flex items-center gap-2">
+               <div className={`w-2 h-2 rounded-full ${isGlobalSyncEnabled ? 'bg-accent animate-pulse shadow-[0_0_10px_var(--accent)]' : 'bg-white/10'}`} />
+               <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{isGlobalSyncEnabled ? 'Live Connection' : 'Offline'}</span>
+            </div>
           </div>
-          <div className="flex flex-col gap-2">
-            <h2 className="text-3xl font-black italic tracking-tighter uppercase">Explore</h2>
-            <p className="text-sm font-bold text-white/30 uppercase tracking-widest">Coming Soon</p>
+
+          <div className="grid grid-cols-1 gap-4">
+            {(() => {
+              const activeTrackers = groups.filter(g => g.notificationsEnabled);
+              
+              if (activeTrackers.length === 0) {
+                return (
+                  <div className="py-20 flex flex-col items-center gap-6 text-center bg-white/5 rounded-[48px] border border-dashed border-white/10">
+                    <Radar size={60} strokeWidth={1} className="text-white/10" />
+                    <p className="text-sm text-white/30 max-w-[200px] leading-relaxed font-bold uppercase tracking-widest leading-relaxed">No active signals found. Enable Auto-Alerts on a channel to begin monitoring.</p>
+                  </div>
+                );
+              }
+
+              return activeTrackers.map(group => {
+                const lastScan = group.lastScanAt ? new Date(group.lastScanAt) : new Date(0);
+                const nextScan = new Date(lastScan.getTime() + group.refreshInterval * 60000);
+                const msRemaining = nextScan.getTime() - tickerTime;
+                const isImminent = msRemaining > 0 && msRemaining < 60000;
+                const isOverdue = msRemaining <= 0 && group.refreshInterval > 0 && isGlobalSyncEnabled;
+
+                return (
+                  <motion.div 
+                    layout
+                    key={group.id}
+                    className="card-rich p-6 flex items-center justify-between relative overflow-hidden"
+                  >
+                    <div className="flex items-center gap-4 relative z-10">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border transition-all duration-500 ${
+                        isOverdue ? 'bg-error/20 border-error/40 text-error' :
+                        isImminent ? 'bg-accent/20 border-accent/40 text-accent animate-pulse' :
+                        'bg-white/5 border-white/10 text-white/20'
+                      }`}>
+                        {(() => {
+                          const Icon = getChannelIcon(group.name);
+                          return <Icon size={20} className={isImminent ? 'animate-bounce' : ''} />;
+                        })()}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-lg font-black tracking-tight uppercase italic leading-none">{group.name}</span>
+                        <div className="flex items-center gap-2 mt-1.5">
+                           <span className="text-[10px] font-black text-accent bg-accent/10 px-2 py-0.5 rounded-md border border-accent/20 uppercase tracking-tighter">
+                             {group.refreshInterval}M PULSE
+                           </span>
+                           <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest leading-none">
+                             {group.keywords.length} TARGETS • {group.language || 'GLOBAL'}
+                           </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-1 relative z-10">
+                      {group.refreshInterval > 0 ? (
+                        <>
+                          <span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Next Scan</span>
+                          <span className={`text-xl font-black tabular-nums tracking-tighter italic leading-none ${
+                            isOverdue || isImminent ? 'text-red-500 animate-pulse' : 'text-white'
+                          }`}>
+                            {msRemaining > 0 ? (() => {
+                              const totalSecs = Math.floor(msRemaining / 1000);
+                              const h = Math.floor(totalSecs / 3600);
+                              const m = Math.floor((totalSecs % 3600) / 60);
+                              const s = totalSecs % 60;
+                              if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                              return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                            })() : (isGlobalSyncEnabled ? 'Scanning...' : 'Paused')}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Manual Trigger Required</span>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              });
+            })()}
           </div>
         </div>
       )}
 
       {activeTab === 'account' && (
-        <div className="pt-32 px-4 flex flex-col items-center justify-center min-h-[60vh] text-center w-full max-w-[720px] mx-auto gap-6 fade-in">
-          <div className="w-24 h-24 rounded-full border border-white/10 bg-white/5 flex flex-col gap-2 items-center justify-center text-accent/20">
-             <User size={40} strokeWidth={1.5} />
+        <div className="pt-24 px-4 sm:px-6 w-full max-w-[720px] mx-auto flex flex-col gap-6 fade-in pb-20">
+          <div className="flex items-center justify-between px-2">
+            <div className="flex flex-col">
+              <h2 className="text-[11px] font-black uppercase tracking-[0.2em] text-white/30">Intelligence Logs</h2>
+              <span className="text-[9px] font-bold text-white/20 uppercase">Encrypted Signal History</span>
+            </div>
+            <button 
+              onClick={() => setShowClearLogsModal(true)}
+              className="text-[10px] font-black text-error/60 hover:text-error transition-all uppercase tracking-widest border border-error/20 px-4 py-2 rounded-xl bg-error/5"
+            >
+              Purge Logs
+            </button>
           </div>
-          <div className="flex flex-col gap-2">
-            <h2 className="text-3xl font-black italic tracking-tighter uppercase">Account</h2>
-            <p className="text-sm font-bold text-white/30 uppercase tracking-widest">Coming Soon</p>
+
+          <div className="flex flex-col gap-4">
+            {historyLogs.length === 0 ? (
+              <div className="py-24 flex flex-col items-center gap-8 text-center bg-white/5 rounded-[48px] border border-dashed border-white/10">
+                <Terminal size={60} strokeWidth={1} className="text-white/10" />
+                <div className="flex flex-col gap-2">
+                  <p className="text-xl font-black uppercase italic tracking-tighter">No signals logged</p>
+                  <p className="text-xs text-white/20 max-w-[200px] leading-relaxed font-bold uppercase tracking-widest">Target acquisitions will be recorded here.</p>
+                </div>
+              </div>
+            ) : (
+              historyLogs.map((log, idx) => (
+                <motion.div 
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  key={log.id}
+                  className="card-rich p-5 flex flex-col gap-4 border-l-2 border-l-accent/40"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                        <span className="text-[11px] font-black text-accent uppercase tracking-widest">{log.channel}</span>
+                      </div>
+                      <h4 className="text-sm font-black text-white/90 uppercase tracking-tight">{log.title}</h4>
+                    </div>
+                    <span className="text-[9px] font-black text-white/20 tabular-nums">
+                      {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </span>
+                  </div>
+                  <p className="text-xs text-white/40 leading-relaxed font-medium">{log.body}</p>
+                  
+                  {log.articles && log.articles.length > 0 && (
+                    <div className="flex flex-col gap-2 mt-2 pt-4 border-t border-white/5">
+                      <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">Intercepted Content:</span>
+                      <div className="flex flex-col gap-2">
+                        {log.articles.slice(0, 3).map((art, i) => (
+                          <div key={i} className="flex flex-col gap-0.5">
+                            <span className="text-[10px] font-bold text-white/60 line-clamp-1">{art.title}</span>
+                            <span className="text-[8px] font-black text-accent uppercase">{art.source}</span>
+                          </div>
+                        ))}
+                        {log.articles.length > 3 && (
+                          <span className="text-[9px] font-bold text-white/20 italic">+{log.articles.length - 3} more articles...</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -960,15 +1234,15 @@ export default function Home() {
              onClick={() => setActiveTab('explore')}
              className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'explore' ? 'text-accent scale-110 drop-shadow-[0_0_15px_rgba(129,76,255,0.8)]' : 'text-white/40 hover:text-white/70'}`}
            >
-             <Compass size={24} strokeWidth={activeTab === 'explore' ? 2.5 : 2} />
-             <span className="text-[9px] font-black uppercase tracking-widest">Explore</span>
+             <Radio size={24} strokeWidth={activeTab === 'explore' ? 2.5 : 2} />
+             <span className="text-[9px] font-black uppercase tracking-widest">Monitor</span>
            </button>
            <button 
              onClick={() => setActiveTab('account')}
              className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'account' ? 'text-accent scale-110 drop-shadow-[0_0_15px_rgba(129,76,255,0.8)]' : 'text-white/40 hover:text-white/70'}`}
            >
-             <User size={24} strokeWidth={activeTab === 'account' ? 2.5 : 2} />
-             <span className="text-[9px] font-black uppercase tracking-widest">Account</span>
+             <Terminal size={24} strokeWidth={activeTab === 'account' ? 2.5 : 2} />
+             <span className="text-[9px] font-black uppercase tracking-widest">Logs</span>
            </button>
         </div>
       </motion.nav>
@@ -1106,12 +1380,14 @@ export default function Home() {
                 </div>
               </div>
 
-              <button 
-                onClick={() => setShowSettings(false)} 
-                className="button-primary py-4 mt-2 text-sm font-black uppercase italic tracking-tighter flex-shrink-0"
-              >
-                Close
-              </button>
+              <div className="p-6 pt-0 flex-shrink-0">
+                <button 
+                  onClick={() => setShowSettings(false)} 
+                  className="button-primary py-4 text-sm font-black uppercase italic tracking-tighter w-full"
+                >
+                  Close
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}
@@ -1200,6 +1476,108 @@ export default function Home() {
                   className="w-full bg-white/5 text-white/40 font-black py-4 rounded-xl hover:bg-white/10 transition-all uppercase tracking-widest text-xs"
                 >
                   Abort
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Premium Rename Modal */}
+      <AnimatePresence>
+        {isRenamingGroupId !== null && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-xl"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="card max-w-[400px] w-full bg-gradient-to-br from-[#1a1b26] to-[#0a0b12] border-accent/20 p-8 flex flex-col gap-6 shadow-[0_0_50px_rgba(168,85,247,0.1)]"
+            >
+               <div className="w-20 h-20 rounded-[32px] bg-accent/10 flex items-center justify-center border border-accent/20 mx-auto">
+                <Edit2 size={40} className="text-accent" />
+              </div>
+              <div className="flex flex-col gap-2 text-center">
+                <h3 className="text-xl font-black uppercase italic tracking-tighter">Rename Channel</h3>
+                <p className="text-sm text-white/40 leading-relaxed">
+                  Update the intelligence identifier for this monitoring pipeline.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-4">
+                <input 
+                  autoFocus
+                  type="text"
+                  value={editGroupName}
+                  onChange={(e) => setEditGroupName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveRename(isRenamingGroupId);
+                    if (e.key === 'Escape') setIsRenamingGroupId(null);
+                  }}
+                  className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:border-accent transition-all shadow-inner"
+                  placeholder="Encryption handle..."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mt-2">
+                <button 
+                  onClick={() => setIsRenamingGroupId(null)}
+                  className="py-4 rounded-2xl bg-white/5 text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all border border-white/5"
+                >
+                  Abort
+                </button>
+                <button 
+                  onClick={() => saveRename(isRenamingGroupId)}
+                  className="py-4 rounded-2xl bg-accent text-white text-xs font-black uppercase tracking-widest hover:brightness-110 shadow-lg shadow-accent/20 transition-all"
+                >
+                  Confirm Rename
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Logs Clear Confirmation Modal */}
+      <AnimatePresence>
+        {showClearLogsModal && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-xl"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="card max-w-[400px] w-full bg-[#0a0b12] border-error/20 p-8 flex flex-col gap-6 shadow-[0_0_50px_rgba(255,51,51,0.1)]"
+            >
+               <div className="w-20 h-20 rounded-[32px] bg-error/10 flex items-center justify-center border border-error/20 mx-auto">
+                <Trash2 size={40} className="text-error" />
+              </div>
+              <div className="flex flex-col gap-2 text-center">
+                <h3 className="text-xl font-black uppercase italic tracking-tighter">Clear All Logs?</h3>
+                <p className="text-sm text-white/40 leading-relaxed">
+                  This will permanently erase your entire intelligence notification history from memory.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-4 mt-2">
+                <button 
+                  onClick={() => setShowClearLogsModal(false)}
+                  className="py-4 rounded-2xl bg-white/5 text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all border border-white/5"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => { setHistoryLogs([]); setShowClearLogsModal(false); }}
+                  className="py-4 rounded-2xl bg-error text-white text-xs font-black uppercase tracking-widest hover:brightness-110 shadow-lg shadow-error/20 transition-all"
+                >
+                  Confirm Clear
                 </button>
               </div>
             </motion.div>
