@@ -77,6 +77,25 @@ const formatTime = (dateStr: string) => {
   return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' }).toUpperCase()} • ${timeStr}`;
 };
 
+const triggerNotification = async (title: string, body: string) => {
+  if (Notification.permission === "granted") {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      registration.showNotification(title, {
+        body,
+        icon: '/icon-192x192.png',
+        badge: '/icon-192x192.png',
+        vibrate: [100, 50, 100],
+        tag: 'intelligence-report',
+        renotify: true
+      });
+    } catch (e) {
+      console.error("SW notification failed, falling back", e);
+      new Notification(title, { body, icon: '/icon-192x192.png' });
+    }
+  }
+};
+
 const formatTimeAgo = (dateStr: string) => {
   const date = new Date(dateStr);
   const now = new Date();
@@ -318,18 +337,11 @@ export default function Home() {
 
   const testNotification = () => {
     if (Notification.permission === "granted") {
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.ready.then(reg => {
-          reg.showNotification("Intelligence Report: Target Acquired", {
-            body: "Encrypted signal established. Real-time surveillance protocols are active.",
-            icon: "/icon-192x192.png"
-          });
-        });
-      } else {
-        new Notification("Intelligence Report: Target Acquired", {
-          body: "Encrypted signal established. Real-time surveillance protocols are active.",
-          icon: "/icon-192x192.png"
-        });
+      if (permission === 'granted') {
+        triggerNotification(
+          "Intelligence Report: Target Acquired", 
+          "Encrypted signal established. Real-time surveillance protocols are active."
+        );
       }
     } else {
       alert("Please allow notifications first!");
@@ -447,11 +459,11 @@ export default function Home() {
           const newArticles = fetchedNews.filter(a => new Date(a.publishedAt) > lastScan);
           
           // Only notify if alerts are specifically enabled for this group AND browser permission is granted
-          if (group.notificationsEnabled && newArticles.length > 0 && Notification.permission === "granted") {
-            new Notification(`NewsPulse: ${group.name}`, {
-              body: `${newArticles.length} new articles found for your keywords!`,
-              icon: '/icon-192x192.png'
-            });
+          if (group.notificationsEnabled && newArticles.length > 0) {
+            triggerNotification(
+              `NewsPulse: ${group.name}`, 
+              `${newArticles.length} new articles found for your keywords!`
+            );
           }
         }
       }
