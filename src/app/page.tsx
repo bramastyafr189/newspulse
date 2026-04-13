@@ -88,7 +88,7 @@ const triggerNotification = async (title: string, body: string) => {
         vibrate: [100, 50, 100],
         tag: 'intelligence-report',
         renotify: true
-      });
+      } as any);
     } catch (e) {
       console.error("SW notification failed, falling back", e);
       new Notification(title, { body, icon: '/icon-192x192.png' });
@@ -337,12 +337,10 @@ export default function Home() {
 
   const testNotification = () => {
     if (Notification.permission === "granted") {
-      if (permission === 'granted') {
-        triggerNotification(
-          "Intelligence Report: Target Acquired", 
-          "Encrypted signal established. Real-time surveillance protocols are active."
-        );
-      }
+      triggerNotification(
+        "Intelligence Report: Target Acquired", 
+        "Encrypted signal established. Real-time surveillance protocols are active."
+      );
     } else {
       alert("Please allow notifications first!");
     }
