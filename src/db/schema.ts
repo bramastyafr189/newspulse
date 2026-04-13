@@ -2,6 +2,23 @@ import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 import { relations } from 'drizzle-orm';
 import { sql } from 'drizzle-orm';
 
+export const intelligenceLogs = sqliteTable('intelligence_logs', {
+  id: text('id').primaryKey(), // Using numeric-like string ID from frontend
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  channel: text('channel').notNull(),
+  timestamp: integer('timestamp', { mode: 'timestamp' }).notNull(),
+});
+
+export const capturedArticles = sqliteTable('captured_articles', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  logId: text('log_id').notNull().references(() => intelligenceLogs.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  url: text('url').notNull(),
+  source: text('source').notNull(),
+  publishedAt: text('published_at').notNull(),
+});
+
 export const interests = sqliteTable('interests', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
@@ -18,6 +35,17 @@ export const keywords = sqliteTable('keywords', {
   interestId: integer('interest_id').notNull().references(() => interests.id, { onDelete: 'cascade' }),
   word: text('word').notNull(),
 });
+
+export const intelligenceLogsRelations = relations(intelligenceLogs, ({ many }) => ({
+  articles: many(capturedArticles),
+}));
+
+export const capturedArticlesRelations = relations(capturedArticles, ({ one }) => ({
+  log: one(intelligenceLogs, {
+    fields: [capturedArticles.logId],
+    references: [intelligenceLogs.id],
+  }),
+}));
 
 export const interestRelations = relations(interests, ({ many }) => ({
   keywords: many(keywords),

@@ -77,6 +77,26 @@ const formatTime = (dateStr: string) => {
   return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' }).toUpperCase()} • ${timeStr}`;
 };
 
+const formatTimeAgo = (dateStr: string) => {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffInMs = now.getTime() - date.getTime();
+  const diffInMins = Math.floor(diffInMs / (1000 * 60));
+  const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+  const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+  
+  // Format to local HH:MM
+  const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  if (diffInMins < 60) {
+    return `${Math.max(1, diffInMins)}M AGO • ${timeStr}`;
+  }
+  if (diffInHours < 24) {
+    return `${diffInHours}H AGO • ${timeStr}`;
+  }
+  return `${diffInDays}D AGO • ${timeStr}`;
+};
+
 interface InterestGroup {
   id: number;
   name: string;
@@ -166,6 +186,7 @@ export default function Home() {
   const [historyLogs, setHistoryLogs] = useState<AppNotification[]>([]);
   const [tickerTime, setTickerTime] = useState(Date.now());
   const [showClearLogsModal, setShowClearLogsModal] = useState(false);
+  const [logChannelFilter, setLogChannelFilter] = useState<string>("all");
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [isRenamingGroupId, setIsRenamingGroupId] = useState<number | null>(null);
   const [editGroupName, setEditGroupName] = useState("");
@@ -197,22 +218,21 @@ export default function Home() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Initialize logs from local storage
+  // Initialize logs from DB
   useEffect(() => {
-    const saved = localStorage.getItem('newspulse_logs');
-    if (saved) {
+    const loadLogs = async () => {
       try {
-        setHistoryLogs(JSON.parse(saved));
+        const res = await fetch('/api/logs');
+        if (res.ok) {
+          const data = await res.json();
+          setHistoryLogs(data);
+        }
       } catch (e) {
-        console.error("Failed to parse logs", e);
+        console.error("Failed to load global logs", e);
       }
-    }
+    };
+    loadLogs();
   }, []);
-
-  // Persist logs to local storage
-  useEffect(() => {
-    localStorage.setItem('newspulse_logs', JSON.stringify(historyLogs));
-  }, [historyLogs]);
 
   // Real-time ticker for countdown precision
   useEffect(() => {
@@ -341,7 +361,7 @@ export default function Home() {
 
         // Create log entry for intelligence persistence
         if (newArticles.length > 0) {
-          const newLog: AppNotification = {
+          const newLog = {
             id: Math.random().toString(36).substr(2, 9),
             title: `+${newArticles.length}`,
             body: `Sync complete for "${targetGroup?.name || 'Channel'}" pipeline.`,
@@ -349,7 +369,18 @@ export default function Home() {
             timestamp: now,
             articles: newArticles
           };
-          setHistoryLogs(prev => [newLog, ...prev].slice(0, 100));
+          
+          try {
+            await fetch('/api/logs', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(newLog)
+            });
+            // Update local state after successful POST
+            setHistoryLogs(prev => [newLog, ...prev].slice(0, 100));
+          } catch (e) {
+            console.error("Failed to sync log to database", e);
+          }
         }
       }
       
@@ -993,10 +1024,11 @@ export default function Home() {
                 <motion.div 
                   key={article.id}
                   initial={{ opacity: 0, scale: 0.98, x: -10 }}
-                  animate={{ opacity: 1, scale: 1, x: 0 }}
+                  whileInView={{ opacity: 1, scale: 1, x: 0 }}
+                  viewport={{ once: true, margin: "-20px" }}
                   transition={{ 
                     duration: 0.3,
-                    delay: i * 0.03,
+                    delay: Math.min(i * 0.03, 0.3),
                     ease: "easeOut"
                   }}
                   className="card-rich group cursor-pointer p-4 sm:p-6 flex gap-4 sm:gap-6 items-start relative overflow-hidden pr-8 sm:pr-14"
@@ -1164,20 +1196,60 @@ export default function Home() {
           </div>
 
           <div className="flex flex-col gap-4">
-            {historyLogs.length === 0 ? (
-              <div className="py-16 flex flex-col items-center gap-4 text-center bg-white/5 rounded-[48px] border border-dashed border-white/10">
-                <Terminal size={60} strokeWidth={1} className="text-white/10" />
-                <div className="flex flex-col gap-2">
-                  <p className="text-xl font-black uppercase italic tracking-tighter">No signals logged</p>
-                  <p className="text-xs text-white/20 max-w-[200px] leading-relaxed font-bold uppercase tracking-widest">Target acquisitions will be recorded here.</p>
-                </div>
+            {/* Log Channel Filter */}
+            {historyLogs.length > 0 && (
+              <div className="flex items-center gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
+                <button
+                  onClick={() => setLogChannelFilter("all")}
+                  className={`flex-shrink-0 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                    logChannelFilter === "all" 
+                      ? "bg-accent text-white shadow-lg shadow-accent/30" 
+                      : "bg-white/5 text-white/40 hover:bg-white/10"
+                  }`}
+                >
+                  All Channels
+                </button>
+                {Array.from(new Set(historyLogs.map(l => l.channel))).map(channel => (
+                  <button
+                    key={channel}
+                    onClick={() => setLogChannelFilter(channel)}
+                    className={`flex-shrink-0 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                      logChannelFilter === channel 
+                        ? "bg-accent text-white shadow-lg shadow-accent/30" 
+                        : "bg-white/5 text-white/40 hover:bg-white/10"
+                    }`}
+                  >
+                    {channel}
+                  </button>
+                ))}
               </div>
-            ) : (
-              historyLogs.map((log, idx) => (
+            )}
+
+            {(() => {
+              const filtered = logChannelFilter === "all" 
+                ? historyLogs 
+                : historyLogs.filter(l => l.channel === logChannelFilter);
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="py-16 flex flex-col items-center gap-4 text-center bg-white/5 rounded-[48px] border border-dashed border-white/10">
+                    <Terminal size={60} strokeWidth={1} className="text-white/10" />
+                    <div className="flex flex-col gap-2">
+                      <p className="text-xl font-black uppercase italic tracking-tighter">No signals found</p>
+                      <p className="text-xs text-white/20 max-w-[200px] leading-relaxed font-bold uppercase tracking-widest">
+                        {logChannelFilter === "all" ? "Target acquisitions will be recorded here." : `No logs found for channel "${logChannelFilter}".`}
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+
+              return filtered.map((log, idx) => (
                 <motion.div 
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: idx * 0.05 }}
+                  initial={{ opacity: 0, x: -15 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true, margin: "-20px" }}
+                  transition={{ duration: 0.3, delay: Math.min(idx * 0.05, 0.2) }}
                   key={log.id}
                   className="card-rich p-4 sm:p-6 flex flex-col gap-4 sm:gap-6 group border border-white/5 relative overflow-hidden"
                 >
@@ -1189,7 +1261,7 @@ export default function Home() {
                   </div>
                   <div className="relative z-10 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                       <span className="text-[9px] font-black text-accent border border-accent/20 bg-accent/5 px-2 py-0.5 rounded-md uppercase tracking-widest">{log.channel}</span>
+                       <span className="text-[9px] font-black text-accent border border-accent/20 bg-accent/5 px-2 py-0.5 rounded-lg uppercase tracking-widest">{log.channel}</span>
                        <span className="w-1 h-1 rounded-full bg-white/10" />
                        <span className="text-[10px] font-black text-white/40 uppercase tracking-tighter">Intelligence:</span>
                        <span className="text-[12px] font-black text-accent italic uppercase tracking-tight">
@@ -1197,7 +1269,7 @@ export default function Home() {
                        </span>
                     </div>
                     <span className="text-[9px] font-black text-white/20 tabular-nums uppercase">
-                      {formatTime(log.timestamp)}
+                      {formatTimeAgo(log.timestamp)}
                     </span>
                   </div>
                   
@@ -1214,7 +1286,11 @@ export default function Home() {
                             className="flex flex-col gap-0.5 border-l border-white/5 pl-3 py-0.5 cursor-pointer hover:border-accent/40 group/art transition-all"
                           >
                             <span className="text-[11px] font-bold text-white/70 line-clamp-1 leading-tight group-hover/art:text-white transition-colors">{art.title}</span>
-                            <span className="text-[8px] font-black text-accent/50 uppercase tracking-widest">{art.source}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[8px] font-black text-accent/50 uppercase tracking-widest">{art.source}</span>
+                              <span className="w-0.5 h-0.5 rounded-full bg-white/10" />
+                              <span className="text-[8px] font-black text-white/20 uppercase tabular-nums">{formatTimeAgo(art.publishedAt)}</span>
+                            </div>
                           </div>
                         ))}
                         {log.articles.length > 3 && (
@@ -1229,8 +1305,8 @@ export default function Home() {
                     </div>
                   )}
                 </motion.div>
-              ))
-            )}
+              ));
+            })()}
           </div>
         </div>
       )}
@@ -1595,7 +1671,15 @@ export default function Home() {
                   Cancel
                 </button>
                 <button 
-                  onClick={() => { setHistoryLogs([]); setShowClearLogsModal(false); }}
+                  onClick={async () => { 
+                    try {
+                      await fetch('/api/logs', { method: 'DELETE' });
+                      setHistoryLogs([]); 
+                    } catch (e) {
+                      console.error("Failed to clear cloud logs", e);
+                    }
+                    setShowClearLogsModal(false); 
+                  }}
                   className="py-4 rounded-2xl bg-error text-white text-xs font-black uppercase tracking-widest hover:brightness-110 shadow-lg shadow-error/20 transition-all"
                 >
                   Confirm Clear
@@ -1644,36 +1728,36 @@ export default function Home() {
                    <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-3">
                          <span className="text-[10px] font-black text-accent border border-accent/20 bg-accent/5 px-3 py-1 rounded-lg uppercase tracking-[.2em]">{selectedLog.channel}</span>
-                         <span className="text-[10px] font-black text-white/20 uppercase tracking-widest">{formatTime(selectedLog.timestamp)}</span>
+                         <span className="text-[10px] font-black text-white/20 uppercase tracking-widest">{formatTimeAgo(selectedLog.timestamp)}</span>
                       </div>
-                      <h3 className="text-2xl font-black italic uppercase tracking-tighter mt-1">
+                      <h3 className="text-lg font-black italic uppercase tracking-tighter mt-1">
                         {selectedLog.title.includes('Intelligence Acquired') ? `+${selectedLog.title.match(/\d+/)?.[0] || ''}` : selectedLog.title} ARTICLES RECOVERED
                       </h3>
                    </div>
                    <button 
                      onClick={() => setSelectedLog(null)}
-                     className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all"
+                     className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all border border-white/5"
                    >
-                     <X size={24} />
+                     <X size={20} />
                    </button>
                 </div>
                 
-                <div className="flex-1 overflow-y-auto p-8 pt-4 flex flex-col gap-4 no-scrollbar">
+                <div className="flex-1 overflow-y-auto p-6 pt-4 flex flex-col gap-3 no-scrollbar">
                    {selectedLog.articles?.map((article, i) => (
                       <motion.div 
                          initial={{ opacity: 0, x: -10 }}
                          animate={{ opacity: 1, x: 0 }}
                          transition={{ delay: i * 0.05 }}
                          key={article.id}
-                         className="flex flex-col gap-2 p-5 rounded-3xl bg-white/5 border border-white/5 hover:border-accent/40 hover:bg-accent/5 transition-all group/art cursor-pointer"
+                         className="flex flex-col gap-1.5 p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-accent/40 hover:bg-accent/5 transition-all group/art cursor-pointer"
                          onClick={() => window.open(article.url, '_blank')}
                       >
-                         <div className="flex items-center gap-3 text-[10px] font-black text-accent/60 uppercase tracking-widest">
+                         <div className="flex items-center gap-3 text-[9px] font-black text-accent/60 uppercase tracking-widest">
                             <span>{article.source}</span>
                             <span className="w-1 h-1 rounded-full bg-white/10" />
-                            <span className="text-white/30">{formatTime(article.publishedAt)}</span>
+                            <span className="text-white/20">{formatTimeAgo(article.publishedAt)}</span>
                          </div>
-                         <h4 className="text-base font-black text-white group-hover/art:text-white leading-tight">{article.title}</h4>
+                         <h4 className="text-[13px] font-bold text-white group-hover/art:text-white leading-snug transition-colors">{article.title}</h4>
                       </motion.div>
                    ))}
                 </div>
