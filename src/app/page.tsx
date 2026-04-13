@@ -233,6 +233,7 @@ export default function Home() {
   const [isGlobalSyncEnabled, setIsGlobalSyncEnabled] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
 
+  const [selectedLog, setSelectedLog] = useState<AppNotification | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
@@ -342,8 +343,8 @@ export default function Home() {
         if (newArticles.length > 0) {
           const newLog: AppNotification = {
             id: Math.random().toString(36).substr(2, 9),
-            title: `Intelligence Acquired: ${newArticles.length} articles`,
-            body: `Intercepted signals for "${targetGroup?.name || 'Channel'}". Priority: High.`,
+            title: `+${newArticles.length}`,
+            body: `Sync complete for "${targetGroup?.name || 'Channel'}" pipeline.`,
             channel: targetGroup?.name || 'Unknown',
             timestamp: now,
             articles: newArticles
@@ -1178,34 +1179,51 @@ export default function Home() {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: idx * 0.05 }}
                   key={log.id}
-                  className="card-rich p-4 flex flex-col gap-3 border-l-2 border-l-accent/40"
+                  className="card-rich p-4 sm:p-6 flex flex-col gap-4 sm:gap-6 group border border-white/5 relative overflow-hidden"
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                        <span className="text-[11px] font-black text-accent uppercase tracking-widest">{log.channel}</span>
-                      </div>
-                      <h4 className="text-sm font-black text-white/90 uppercase tracking-tight">{log.title}</h4>
+                  <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
+                    {(() => {
+                      const BgIcon = getChannelIcon(log.channel);
+                      return <BgIcon size={140} strokeWidth={4} />;
+                    })()}
+                  </div>
+                  <div className="relative z-10 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                       <span className="text-[9px] font-black text-accent border border-accent/20 bg-accent/5 px-2 py-0.5 rounded-md uppercase tracking-widest">{log.channel}</span>
+                       <span className="w-1 h-1 rounded-full bg-white/10" />
+                       <span className="text-[10px] font-black text-white/40 uppercase tracking-tighter">Intelligence:</span>
+                       <span className="text-[12px] font-black text-accent italic uppercase tracking-tight">
+                         {log.title.includes('Intelligence Acquired') ? `+${log.title.match(/\d+/)?.[0] || ''}` : log.title}
+                       </span>
                     </div>
-                    <span className="text-[9px] font-black text-white/20 tabular-nums">
-                      {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    <span className="text-[9px] font-black text-white/20 tabular-nums uppercase">
+                      {formatTime(log.timestamp)}
                     </span>
                   </div>
-                  <p className="text-xs text-white/40 leading-relaxed font-medium">{log.body}</p>
                   
                   {log.articles && log.articles.length > 0 && (
-                    <div className="flex flex-col gap-1.5 mt-1 pt-3 border-t border-white/5">
-                      <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">Intercepted Content:</span>
+                    <div className="flex flex-col gap-2">
                       <div className="flex flex-col gap-1.5">
                         {log.articles.slice(0, 3).map((art, i) => (
-                          <div key={i} className="flex flex-col gap-0.5">
-                            <span className="text-[10px] font-bold text-white/60 line-clamp-1">{art.title}</span>
-                            <span className="text-[8px] font-black text-accent uppercase">{art.source}</span>
+                          <div 
+                            key={i} 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(art.url, '_blank');
+                            }}
+                            className="flex flex-col gap-0.5 border-l border-white/5 pl-3 py-0.5 cursor-pointer hover:border-accent/40 group/art transition-all"
+                          >
+                            <span className="text-[11px] font-bold text-white/70 line-clamp-1 leading-tight group-hover/art:text-white transition-colors">{art.title}</span>
+                            <span className="text-[8px] font-black text-accent/50 uppercase tracking-widest">{art.source}</span>
                           </div>
                         ))}
                         {log.articles.length > 3 && (
-                          <span className="text-[9px] font-bold text-white/20 italic">+{log.articles.length - 3} more articles...</span>
+                          <button 
+                            onClick={() => setSelectedLog(log)}
+                            className="text-[9px] font-black text-accent/60 hover:text-accent italic ml-3 transition-colors uppercase tracking-widest"
+                          >
+                            + {log.articles.length - 3} MORE ENTRIES • CLICK TO EXPAND
+                          </button>
                         )}
                       </div>
                     </div>
@@ -1605,6 +1623,67 @@ export default function Home() {
           </motion.div>
         )}
       </AnimatePresence>
+      {/* Log Article Detail Modal */}
+      <AnimatePresence>
+        {selectedLog && (
+          <motion.div 
+             initial={{ opacity: 0 }}
+             animate={{ opacity: 1 }}
+             exit={{ opacity: 0 }}
+             className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 sm:p-10"
+             onClick={() => setSelectedLog(null)}
+          >
+             <motion.div 
+               initial={{ scale: 0.9, opacity: 0, y: 20 }}
+               animate={{ scale: 1, opacity: 1, y: 0 }}
+               exit={{ scale: 0.9, opacity: 0, y: 20 }}
+               className="bg-[#0a0a0c] w-full max-w-2xl max-h-[80vh] rounded-[48px] border border-white/10 flex flex-col shadow-2xl overflow-hidden"
+               onClick={e => e.stopPropagation()}
+             >
+                <div className="p-8 pb-4 flex items-center justify-between border-b border-white/5">
+                   <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-3">
+                         <span className="text-[10px] font-black text-accent border border-accent/20 bg-accent/5 px-3 py-1 rounded-lg uppercase tracking-[.2em]">{selectedLog.channel}</span>
+                         <span className="text-[10px] font-black text-white/20 uppercase tracking-widest">{formatTime(selectedLog.timestamp)}</span>
+                      </div>
+                      <h3 className="text-2xl font-black italic uppercase tracking-tighter mt-1">
+                        {selectedLog.title.includes('Intelligence Acquired') ? `+${selectedLog.title.match(/\d+/)?.[0] || ''}` : selectedLog.title} ARTICLES RECOVERED
+                      </h3>
+                   </div>
+                   <button 
+                     onClick={() => setSelectedLog(null)}
+                     className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all"
+                   >
+                     <X size={24} />
+                   </button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-8 pt-4 flex flex-col gap-4 no-scrollbar">
+                   {selectedLog.articles?.map((article, i) => (
+                      <motion.div 
+                         initial={{ opacity: 0, x: -10 }}
+                         animate={{ opacity: 1, x: 0 }}
+                         transition={{ delay: i * 0.05 }}
+                         key={article.id}
+                         className="flex flex-col gap-2 p-5 rounded-3xl bg-white/5 border border-white/5 hover:border-accent/40 hover:bg-accent/5 transition-all group/art cursor-pointer"
+                         onClick={() => window.open(article.url, '_blank')}
+                      >
+                         <div className="flex items-center gap-3 text-[10px] font-black text-accent/60 uppercase tracking-widest">
+                            <span>{article.source}</span>
+                            <span className="w-1 h-1 rounded-full bg-white/10" />
+                            <span className="text-white/30">{formatTime(article.publishedAt)}</span>
+                         </div>
+                         <h4 className="text-base font-black text-white group-hover/art:text-white leading-tight">{article.title}</h4>
+                      </motion.div>
+                   ))}
+                </div>
+                
+                <div className="p-8 pt-0 mt-4 h-2 bg-gradient-to-t from-[#0a0a0c] to-transparent pointer-events-none" />
+             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </main>
   );
 }

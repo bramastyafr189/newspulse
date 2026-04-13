@@ -11,7 +11,7 @@ export interface NewsArticle {
 export async function fetchNews(keywords: string[], lang?: string | null, country?: string | null): Promise<NewsArticle[]> {
   if (keywords.length === 0) return [];
 
-  const query = keywords.join(" ");
+  const query = keywords.join(" OR ");
   let url = `/api/news?q=${encodeURIComponent(query)}`;
   if (lang && lang !== 'any') url += `&lang=${lang}`;
   if (country && country !== 'any') url += `&country=${country}`;
