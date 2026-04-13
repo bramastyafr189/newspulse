@@ -572,7 +572,7 @@ export default function Home() {
         initial={{ y: 0 }}
         animate={{ y: isNavVisible ? 0 : "-100%" }}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="glass fixed top-0 left-0 right-0 z-50 px-4 py-3"
+        className="glass fixed top-0 left-0 right-0 z-50 px-4 py-2"
       >
         <div className="nav-container mx-auto">
           <motion.div 
@@ -582,7 +582,7 @@ export default function Home() {
           >
             <div className="relative group">
               <div className="absolute -inset-1 bg-accent/20 rounded-xl blur-md group-hover:bg-accent/30 transition-all animate-pulse-slow" />
-              <div className="relative w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden border border-white/10 glass-light">
+              <div className="relative w-9 h-9 rounded-xl flex items-center justify-center overflow-hidden border border-white/10 glass-light">
                 <img src="/icon-192x192.png" alt="NewsPulse Logo" className="w-full h-full object-cover" />
               </div>
             </div>
@@ -595,7 +595,7 @@ export default function Home() {
           <div className="flex items-center gap-2">
             <button 
               onClick={() => setShowSettings(!showSettings)}
-              className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center border border-white/5 hover:bg-white/10 transition-all active:scale-95"
+              className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center border border-white/5 hover:bg-white/10 transition-all active:scale-95"
             >
               <LayoutGrid size={20} className="text-white/70" />
             </button>
@@ -605,10 +605,10 @@ export default function Home() {
 
       {/* Main Content Areas */}
       {activeTab === 'home' && (
-        <div className="pt-24 px-4 sm:px-6 w-full max-w-[720px] mx-auto flex flex-col gap-6 fade-in">
+        <div className="pt-20 px-4 sm:px-6 w-full max-w-[720px] mx-auto flex flex-col gap-4 fade-in">
         
         {/* Horizontal Channel Bar */}
-        <section className="flex flex-col gap-6">
+        <section className="flex flex-col gap-3">
           <div className="flex items-center justify-between px-2">
             <h2 className="text-[11px] font-black uppercase tracking-[0.2em] text-white/30">Intelligence Hub</h2>
             <button 
@@ -620,7 +620,7 @@ export default function Home() {
           </div>
 
           <div 
-            className={`flex gap-3 pb-4 -mx-1 px-1 ${channelScroll.className}`}
+            className={`flex gap-3 pb-2 -mx-1 px-1 ${channelScroll.className}`}
             ref={channelScroll.ref}
             onMouseDown={channelScroll.onMouseDown}
             onMouseLeave={channelScroll.onMouseLeave}
@@ -663,37 +663,39 @@ export default function Home() {
                 initial={{ opacity: 0, scale: 0.9, y: -20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9, y: -20 }}
-                className="card flex flex-col gap-4 bg-gradient-to-br from-white/[0.08] to-transparent p-6 border-accent/20"
+                className="card-rich p-4 sm:p-6 border-accent/20"
               >
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold uppercase tracking-wider">New Channel</h3>
-                  <X size={18} className="text-white/20 cursor-pointer hover:text-white" onClick={() => setIsCreatingGroup(false)} />
-                </div>
-                <div className="flex flex-col gap-3">
-                  <input 
-                    type="text" 
-                    autoFocus
-                    value={newGroupName}
-                    onChange={(e) => setNewGroupName(e.target.value)}
-                    placeholder="E.g. Middle East War, Crypto..."
-                    className="input-field"
-                  />
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="relative">
-                      <select 
-                        value={newGroupLang}
-                        onChange={(e) => setNewGroupLang(e.target.value)}
-                        className="input-field py-3 pr-10 text-sm appearance-none cursor-pointer"
-                      >
-                        {LANGUAGES.map(l => (
-                          <option key={l.code} value={l.code}>{l.flag} {l.name}</option>
-                        ))}
-                      </select>
-                      <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+                <div className="flex flex-col gap-4 sm:gap-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-white/40">New Channel</h3>
+                    <X size={18} className="text-white/20 cursor-pointer hover:text-white" onClick={() => setIsCreatingGroup(false)} />
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    <input 
+                      type="text" 
+                      autoFocus
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      placeholder="E.g. Middle East War, Crypto..."
+                      className="input-field py-3 px-4 text-sm"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="relative">
+                        <select 
+                          value={newGroupLang}
+                          onChange={(e) => setNewGroupLang(e.target.value)}
+                          className="input-field py-3 pr-10 text-xs appearance-none cursor-pointer"
+                        >
+                          {LANGUAGES.map(l => (
+                            <option key={l.code} value={l.code}>{l.flag} {l.name}</option>
+                          ))}
+                        </select>
+                        <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+                      </div>
+                      <button onClick={createGroup} className="button-primary py-3 px-4 text-xs font-black uppercase">
+                        Initialize
+                      </button>
                     </div>
-                    <button onClick={createGroup} className="button-primary py-3">
-                      Initialize
-                    </button>
                   </div>
                 </div>
               </motion.div>
@@ -706,9 +708,9 @@ export default function Home() {
           <motion.section 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col gap-8"
+            className="flex flex-col gap-4"
           >
-            <div className="card-rich p-6 sm:p-10 relative overflow-hidden group">
+            <div className="card-rich p-4 sm:p-6 relative overflow-hidden group">
               <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
                 {(() => {
                     const IconObj = getChannelIcon(activeGroup.name);
@@ -716,9 +718,9 @@ export default function Home() {
                 })()}
               </div>
               
-              <div className="relative z-10 flex flex-col gap-8 sm:gap-10">
+              <div className="relative z-10 flex flex-col gap-4 sm:gap-6">
                 <div className="flex items-start justify-between">
-                  <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <div className="badge bg-accent text-white shadow-lg shadow-accent/20">Active Channel</div>
                       <div className="badge bg-white/10 text-white/60 border border-white/5 flex items-center gap-1.5 backdrop-blur-sm">
@@ -726,7 +728,7 @@ export default function Home() {
                         <span>{LANGUAGES.find(l => l.code === (activeGroup.language || 'any'))?.name}</span>
                       </div>
                     </div>
-                    <h3 className="text-4xl sm:text-5xl font-black uppercase tracking-tighter italic break-all leading-[0.9]">{activeGroup.name}</h3>
+                    <h3 className="text-2xl sm:text-3xl font-black uppercase tracking-tighter italic break-words leading-tight">{activeGroup.name}</h3>
                   </div>
                   <div className="relative flex-shrink-0">
                     <button 
@@ -862,9 +864,9 @@ export default function Home() {
                       onChange={(e) => setNewKeyword(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && addKeyword()}
                       placeholder="Focus area..."
-                      className="input-field flex-1 bg-black/40 border-white/5 py-5 px-6"
+                      className="input-field flex-1 bg-black/40 border-white/5 py-3 px-4"
                     />
-                    <button onClick={addKeyword} className="w-14 h-14 rounded-2xl bg-white/10 flex-shrink-0 flex items-center justify-center hover:bg-white/20 transition-all border border-white/5">
+                    <button onClick={addKeyword} className="w-12 h-12 rounded-2xl bg-white/10 flex-shrink-0 flex items-center justify-center hover:bg-white/20 transition-all border border-white/5">
                       <Plus size={28} />
                     </button>
                   </div>
@@ -887,7 +889,7 @@ export default function Home() {
                   )}
                 </div>
 
-                <div className={`flex flex-col sm:flex-row items-stretch sm:items-center justify-between border-t border-white/5 gap-8 ${
+                <div className={`flex flex-col sm:flex-row items-stretch sm:items-center justify-between border-t border-white/5 gap-4 ${
                   activeGroup.keywords.length > 0 ? 'pt-5 mt-0' : 'pt-4 mt-0'
                 }`}>
                   <div className="flex items-center gap-4">
@@ -910,7 +912,7 @@ export default function Home() {
                   {activeGroup.keywords.length > 0 && (
                     <button 
                       onClick={triggerManualFetch} 
-                      className="button-primary flex items-center gap-4 group/btn py-5 px-10 shadow-2xl"
+                      className="button-primary flex items-center gap-4 group/btn py-3 px-6 shadow-2xl"
                     >
                       <Search size={22} className="group-hover/btn:rotate-12 transition-transform" />
                       <span className="text-xs uppercase tracking-[0.2em] font-black italic">Scan Pipeline</span>
@@ -923,7 +925,7 @@ export default function Home() {
         )}
 
         {/* News Feed Gallery */}
-        <section className="flex flex-col gap-6">
+        <section className="flex flex-col gap-4">
           <div className="flex items-center justify-between px-2">
             <h2 className="text-[11px] font-black uppercase tracking-widest text-white/40">
               Intelligence Feed
@@ -996,7 +998,7 @@ export default function Home() {
                     delay: i * 0.03,
                     ease: "easeOut"
                   }}
-                  className="card-rich group cursor-pointer p-5 sm:p-6 flex gap-5 items-start relative overflow-hidden pr-8 sm:pr-14"
+                  className="card-rich group cursor-pointer p-4 sm:p-6 flex gap-4 sm:gap-6 items-start relative overflow-hidden pr-8 sm:pr-14"
                   onClick={() => window.open(article.url, '_blank')}
                 >
                   <div className="flex-1 flex flex-col gap-2 min-w-0 z-10">
@@ -1057,7 +1059,7 @@ export default function Home() {
       )}
 
       {activeTab === 'explore' && (
-        <div className="pt-24 px-4 sm:px-6 w-full max-w-[720px] mx-auto flex flex-col gap-6 fade-in pb-20">
+        <div className="pt-20 px-4 sm:px-6 w-full max-w-[720px] mx-auto flex flex-col gap-4 fade-in pb-20">
           <div className="flex items-center justify-between px-2">
             <h2 className="text-[11px] font-black uppercase tracking-[0.2em] text-white/30">Monitoring Hub</h2>
             <div className="flex items-center gap-2">
@@ -1072,7 +1074,7 @@ export default function Home() {
               
               if (activeTrackers.length === 0) {
                 return (
-                  <div className="py-20 flex flex-col items-center gap-6 text-center bg-white/5 rounded-[48px] border border-dashed border-white/10">
+                  <div className="py-12 flex flex-col items-center gap-4 text-center bg-white/5 rounded-[48px] border border-dashed border-white/10">
                     <Radar size={60} strokeWidth={1} className="text-white/10" />
                     <p className="text-sm text-white/30 max-w-[200px] leading-relaxed font-bold uppercase tracking-widest leading-relaxed">No active signals found. Enable Auto-Alerts on a channel to begin monitoring.</p>
                   </div>
@@ -1090,9 +1092,9 @@ export default function Home() {
                   <motion.div 
                     layout
                     key={group.id}
-                    className="card-rich p-6 flex items-center justify-between relative overflow-hidden"
+                    className="card-rich p-4 flex items-center justify-between relative overflow-hidden"
                   >
-                    <div className="flex items-center gap-4 relative z-10">
+                    <div className="flex items-center gap-3 relative z-10">
                       <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border transition-all duration-500 ${
                         isOverdue ? 'bg-error/20 border-error/40 text-error' :
                         isImminent ? 'bg-accent/20 border-accent/40 text-accent animate-pulse' :
@@ -1105,7 +1107,7 @@ export default function Home() {
                       </div>
                       <div className="flex flex-col">
                         <span className="text-lg font-black tracking-tight uppercase italic leading-none">{group.name}</span>
-                        <div className="flex items-center gap-2 mt-1.5">
+                        <div className="flex items-center gap-2 mt-1">
                            <span className="text-[10px] font-black text-accent bg-accent/10 px-2 py-0.5 rounded-md border border-accent/20 uppercase tracking-tighter">
                              {group.refreshInterval}M PULSE
                            </span>
@@ -1116,7 +1118,7 @@ export default function Home() {
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-end gap-1 relative z-10">
+                    <div className="flex flex-col items-end gap-0.5 relative z-10">
                       {group.refreshInterval > 0 ? (
                         <>
                           <span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Next Scan</span>
@@ -1146,7 +1148,7 @@ export default function Home() {
       )}
 
       {activeTab === 'account' && (
-        <div className="pt-24 px-4 sm:px-6 w-full max-w-[720px] mx-auto flex flex-col gap-6 fade-in pb-20">
+        <div className="pt-20 px-4 sm:px-6 w-full max-w-[720px] mx-auto flex flex-col gap-4 fade-in pb-20">
           <div className="flex items-center justify-between px-2">
             <div className="flex flex-col">
               <h2 className="text-[11px] font-black uppercase tracking-[0.2em] text-white/30">Intelligence Logs</h2>
@@ -1162,7 +1164,7 @@ export default function Home() {
 
           <div className="flex flex-col gap-4">
             {historyLogs.length === 0 ? (
-              <div className="py-24 flex flex-col items-center gap-8 text-center bg-white/5 rounded-[48px] border border-dashed border-white/10">
+              <div className="py-16 flex flex-col items-center gap-4 text-center bg-white/5 rounded-[48px] border border-dashed border-white/10">
                 <Terminal size={60} strokeWidth={1} className="text-white/10" />
                 <div className="flex flex-col gap-2">
                   <p className="text-xl font-black uppercase italic tracking-tighter">No signals logged</p>
@@ -1176,7 +1178,7 @@ export default function Home() {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: idx * 0.05 }}
                   key={log.id}
-                  className="card-rich p-5 flex flex-col gap-4 border-l-2 border-l-accent/40"
+                  className="card-rich p-4 flex flex-col gap-3 border-l-2 border-l-accent/40"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex flex-col gap-1">
@@ -1193,9 +1195,9 @@ export default function Home() {
                   <p className="text-xs text-white/40 leading-relaxed font-medium">{log.body}</p>
                   
                   {log.articles && log.articles.length > 0 && (
-                    <div className="flex flex-col gap-2 mt-2 pt-4 border-t border-white/5">
+                    <div className="flex flex-col gap-1.5 mt-1 pt-3 border-t border-white/5">
                       <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">Intercepted Content:</span>
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-1.5">
                         {log.articles.slice(0, 3).map((art, i) => (
                           <div key={i} className="flex flex-col gap-0.5">
                             <span className="text-[10px] font-bold text-white/60 line-clamp-1">{art.title}</span>
@@ -1220,28 +1222,28 @@ export default function Home() {
         initial={{ y: 0 }}
         animate={{ y: isNavVisible ? 0 : "100%" }}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="fixed bottom-0 left-0 right-0 z-40 bg-[#050507]/90 backdrop-blur-3xl border-t border-white/10 pb-safe pb-4 sm:pb-6 pt-4 px-6 flex items-center justify-center"
+        className="fixed bottom-0 left-0 right-0 z-40 bg-[#050507]/90 backdrop-blur-3xl border-t border-white/10 pb-safe pb-3 sm:pb-4 pt-3 px-6 flex items-center justify-center"
       >
-        <div className="flex items-center gap-12 sm:gap-24">
+        <div className="flex items-center gap-10 sm:gap-20">
            <button 
              onClick={() => setActiveTab('home')}
-             className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'home' ? 'text-accent scale-110 drop-shadow-[0_0_15px_rgba(129,76,255,0.8)]' : 'text-white/40 hover:text-white/70'}`}
+             className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'home' ? 'text-accent scale-110 drop-shadow-[0_0_15px_rgba(129,76,255,0.8)]' : 'text-white/40 hover:text-white/70'}`}
            >
-             <HomeIcon size={24} strokeWidth={activeTab === 'home' ? 2.5 : 2} />
+             <HomeIcon size={20} strokeWidth={activeTab === 'home' ? 2.5 : 2} />
              <span className="text-[9px] font-black uppercase tracking-widest">Home</span>
            </button>
            <button 
              onClick={() => setActiveTab('explore')}
-             className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'explore' ? 'text-accent scale-110 drop-shadow-[0_0_15px_rgba(129,76,255,0.8)]' : 'text-white/40 hover:text-white/70'}`}
+             className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'explore' ? 'text-accent scale-110 drop-shadow-[0_0_15px_rgba(129,76,255,0.8)]' : 'text-white/40 hover:text-white/70'}`}
            >
-             <Radio size={24} strokeWidth={activeTab === 'explore' ? 2.5 : 2} />
+             <Radio size={20} strokeWidth={activeTab === 'explore' ? 2.5 : 2} />
              <span className="text-[9px] font-black uppercase tracking-widest">Monitor</span>
            </button>
            <button 
              onClick={() => setActiveTab('account')}
-             className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'account' ? 'text-accent scale-110 drop-shadow-[0_0_15px_rgba(129,76,255,0.8)]' : 'text-white/40 hover:text-white/70'}`}
+             className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'account' ? 'text-accent scale-110 drop-shadow-[0_0_15px_rgba(129,76,255,0.8)]' : 'text-white/40 hover:text-white/70'}`}
            >
-             <Terminal size={24} strokeWidth={activeTab === 'account' ? 2.5 : 2} />
+             <Terminal size={20} strokeWidth={activeTab === 'account' ? 2.5 : 2} />
              <span className="text-[9px] font-black uppercase tracking-widest">Logs</span>
            </button>
         </div>
@@ -1254,14 +1256,15 @@ export default function Home() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-xl flex items-end justify-center p-0"
+            className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-md flex items-end justify-center p-0"
             onClick={() => setShowSettings(false)}
           >
             <motion.div 
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              transition={{ type: "spring", damping: 30, stiffness: 300, restDelta: 0.1, restSpeed: 0.1 }}
+              style={{ willChange: 'transform' }}
               drag="y"
               dragConstraints={{ top: 0 }}
               dragElastic={{ top: 0, bottom: 0.5 }}
@@ -1274,7 +1277,7 @@ export default function Home() {
               onClick={e => e.stopPropagation()}
             >
               {/* Draggable Handle and Header Area */}
-              <div className="pt-6 sm:pt-8 pb-5 px-6 sm:px-8 flex-shrink-0 cursor-grab active:cursor-grabbing w-full flex flex-col gap-5 rounded-t-[48px]">
+              <div className="pt-4 sm:pt-6 pb-3 px-6 sm:px-8 flex-shrink-0 cursor-grab active:cursor-grabbing w-full flex flex-col gap-3 rounded-t-[48px]">
                 <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto flex-shrink-0" />
                 <div className="flex items-center justify-between flex-shrink-0">
                   <div className="flex flex-col cursor-default">
@@ -1293,12 +1296,12 @@ export default function Home() {
 
               {/* Scrollable Content Area (Excluded from Drag) */}
               <div 
-                className="px-6 sm:px-8 pb-6 sm:pb-8 flex flex-col sm:grid sm:grid-cols-2 gap-4 flex-1 max-h-[70vh] overflow-y-auto no-scrollbar"
+                className="px-4 sm:px-6 pb-4 sm:pb-6 flex flex-col sm:grid sm:grid-cols-2 gap-4 flex-1 max-h-[70vh] overflow-y-auto no-scrollbar"
                 onPointerDownCapture={e => e.stopPropagation()}
               >
                 {/* Column 1: Alerts & Sync */}
                 <div className="flex flex-col gap-4">
-                  <div className="card bg-white/5 border-white/5 p-4 flex flex-col gap-4">
+                  <div className="card bg-white/5 border-white/5 p-3 flex flex-col gap-2">
                       <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                               <div className={`p-3 rounded-xl ${notificationsAllowed ? 'bg-accent/20 text-accent' : 'bg-white/5 text-muted'}`}>
@@ -1317,7 +1320,7 @@ export default function Home() {
                       </div>
                   </div>
 
-                  <div className="card bg-white/5 border-white/5 p-4 flex flex-col gap-4">
+                  <div className="card bg-white/5 border-white/5 p-3 flex flex-col gap-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className={`p-3 rounded-xl transition-colors ${isGlobalSyncEnabled ? 'bg-accent/20 text-accent' : 'bg-white/5 text-white/20'}`}>
@@ -1358,7 +1361,7 @@ export default function Home() {
                 </div>
 
                 {/* Column 2: Bulk Actions (Moved inside a single card) */}
-                <div className="card bg-white/5 border-white/5 p-4 flex flex-col justify-between gap-4">
+                <div className="card bg-white/5 border-white/5 p-3 flex flex-col justify-between gap-3">
                   <div className="flex flex-col gap-1">
                       <span className="font-black text-sm tracking-tight text-white/90">BULK ACTIONS</span>
                       <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">Global Automation</span>
@@ -1366,13 +1369,13 @@ export default function Home() {
                   <div className="flex flex-col gap-2">
                       <button 
                         onClick={() => toggleAllNotifications(true)}
-                        className="w-full bg-accent/10 border border-accent/20 text-accent text-xs font-black py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-accent hover:text-white transition-all uppercase tracking-widest"
+                        className="w-full bg-accent/10 border border-accent/20 text-accent text-xs font-black py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-accent hover:text-white transition-all uppercase tracking-widest"
                       >
                          <Bell size={14} /> Enable All
                       </button>
                       <button 
                          onClick={() => toggleAllNotifications(false)}
-                         className="w-full bg-white/5 border border-white/10 text-white/50 text-xs font-black py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-error/20 hover:text-error transition-all uppercase tracking-widest"
+                         className="w-full bg-white/5 border border-white/10 text-white/50 text-xs font-black py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-error/20 hover:text-error transition-all uppercase tracking-widest"
                       >
                          <BellOff size={14} /> Silence All
                       </button>
@@ -1383,7 +1386,7 @@ export default function Home() {
               <div className="p-6 pt-0 flex-shrink-0">
                 <button 
                   onClick={() => setShowSettings(false)} 
-                  className="button-primary py-4 text-sm font-black uppercase italic tracking-tighter w-full"
+                  className="button-primary py-3 text-sm font-black uppercase italic tracking-tighter w-full"
                 >
                   Close
                 </button>
