@@ -137,6 +137,21 @@ const getChannelIcon = (name: string) => {
   return CHANNEL_ICONS[Math.abs(hash) % CHANNEL_ICONS.length];
 };
 
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/\-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
 const LANGUAGES = [
   { code: 'any', name: 'Global (All)', flag: '🌐' },
   { code: 'en', name: 'English', flag: '🇺🇸' },
@@ -237,9 +252,10 @@ export default function Home() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Initialize logs from DB
+  // Initialize logs & channels from DB, then periodic refresh
   useEffect(() => {
-    const loadLogs = async () => {
+    const init = async () => {
+      // 1. Load Logs
       try {
         const res = await fetch('/api/logs');
         if (res.ok) {
@@ -249,8 +265,39 @@ export default function Home() {
       } catch (e) {
         console.error("Failed to load global logs", e);
       }
+
+      // 2. Load Interests (Channels) initially
+      try {
+        const res = await fetch('/api/interests');
+        if (res.ok) {
+          const data = await res.json();
+          setGroups(data);
+        }
+      } catch (e) {
+        console.error("Failed to load interests", e);
+      }
+
+      // 3. Re-register Push if permission is already handled
+      if (Notification.permission === 'granted') {
+        subscribeToPushNotifications();
+      }
     };
-    loadLogs();
+    init();
+
+    // 4. Set up light background refresh (every 45s) for state sync
+    const syncInterval = setInterval(async () => {
+      if (activeTab === 'home' || activeTab === 'monitor') {
+        try {
+          const res = await fetch('/api/interests');
+          if (res.ok) {
+            const data = await res.json();
+            setGroups(data);
+          }
+        } catch (e) {}
+      }
+    }, 45000);
+
+    return () => clearInterval(syncInterval);
   }, []);
 
   // Real-time ticker for countdown precision
@@ -268,9 +315,10 @@ export default function Home() {
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [groupToDelete, setGroupToDelete] = useState<number | null>(null);
   const [keywordToDelete, setKeywordToDelete] = useState<{ id: number; word: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<'home' | 'explore' | 'account'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'explore' | 'account' | 'monitor'>('home');
   const [isGlobalSyncEnabled, setIsGlobalSyncEnabled] = useState(true);
-  const [isScanning, setIsScanning] = useState(false);
+  const [isScanningAtId, setIsScanningAtId] = useState<number | null>(null);
+  const [isScanning, setIsScanning] = useState(false); // Global scanning status flag
 
   const [selectedLog, setSelectedLog] = useState<AppNotification | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -329,10 +377,44 @@ export default function Home() {
   const uniqueSources = Array.from(new Set(news.map(n => n.source))).filter(Boolean).sort();
   const filteredNews = sourceFilter === "all" ? news : news.filter(n => n.source === sourceFilter);
 
+  const subscribeToPushNotifications = async () => {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      
+      // Get the existing subscription
+      let subscription = await registration.pushManager.getSubscription();
+      
+      if (!subscription) {
+        // Subscribe the user
+        const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+        if (!publicKey) return;
+
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey)
+        });
+      }
+
+      // Send the subscription to your server
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(subscription)
+      });
+      
+      console.log('Push subscription established successfully.');
+    } catch (error) {
+      console.error('Push registration error:', error);
+    }
+  };
+
   const requestNotificationPermission = async () => {
     if (!("Notification" in window)) return;
     const permission = await Notification.requestPermission();
-    setNotificationsAllowed(permission === "granted");
+    if (permission === 'granted') {
+      await subscribeToPushNotifications();
+      setNotificationsAllowed(true);
+    }
   };
 
   const testNotification = () => {
@@ -423,56 +505,8 @@ export default function Home() {
     }
   };
 
-  // Background Polling Logic: Ensures news is always fresh and alerts are sent
-  useEffect(() => {
-    const pollInterval = setInterval(async () => {
-      // 1. Check Global Master Switch
-      if (!isGlobalSyncEnabled) return;
-
-      const now = new Date();
-      let scanPerformed = false;
-      
-      for (const group of groupsRef.current) {
-        // Skip if alerts are off (to save API quota), or no keywords/interval defined
-        if (!group.notificationsEnabled || group.refreshInterval <= 0 || group.keywords.length === 0) continue;
-        
-        const lastScan = group.lastScanAt ? new Date(group.lastScanAt) : new Date(0);
-        const diffMinutes = (now.getTime() - lastScan.getTime()) / (1000 * 60);
-
-        if (diffMinutes >= group.refreshInterval) {
-          if (!scanPerformed) {
-             scanPerformed = true;
-             setIsScanning(true);
-          }
-
-          console.log(`[Auto-Scan] Processing: ${group.name}`);
-          const fetchedNews = await handleFetch(
-            group.keywords.map(k => k.word),
-            group.language,
-            group.country,
-            group.id
-          );
-
-          // Find "New" articles (published after last scan)
-          const newArticles = fetchedNews.filter(a => new Date(a.publishedAt) > lastScan);
-          
-          // Only notify if alerts are specifically enabled for this group AND browser permission is granted
-          if (group.notificationsEnabled && newArticles.length > 0) {
-            triggerNotification(
-              `NewsPulse: ${group.name}`, 
-              `${newArticles.length} new articles found for your keywords!`
-            );
-          }
-        }
-      }
-
-      if (scanPerformed) {
-        setTimeout(() => setIsScanning(false), 3000); // Visual feedback duration
-      }
-    }, 10000); // Pulse check every 10 seconds for precise monitoring
-
-    return () => clearInterval(pollInterval);
-  }, [activeGroupId, isGlobalSyncEnabled]); // Re-run if global sync changes
+  // Background Polling Logic removed in favor of Server-Side Cron Scanning
+  // This ensures better battery life and background reliability on mobile.
 
   const createGroup = async () => {
     if (!newGroupName.trim()) return;
@@ -1135,52 +1169,69 @@ export default function Home() {
                   <motion.div 
                     layout
                     key={group.id}
-                    className="card-rich p-4 flex items-center justify-between relative overflow-hidden"
+                    className="card-rich p-4 flex items-center justify-between relative overflow-hidden group/mcard"
                   >
                     <div className="flex items-center gap-3 relative z-10">
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border transition-all duration-500 ${
-                        isOverdue ? 'bg-error/20 border-error/40 text-error' :
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-all duration-500 ${
+                        isOverdue ? 'bg-accent/10 border-accent/30 text-accent animate-pulse' :
                         isImminent ? 'bg-accent/20 border-accent/40 text-accent animate-pulse' :
                         'bg-white/5 border-white/10 text-white/20'
                       }`}>
                         {(() => {
                           const Icon = getChannelIcon(group.name);
-                          return <Icon size={20} className={isImminent ? 'animate-bounce' : ''} />;
+                          return <Icon size={18} className={isImminent || isOverdue ? 'animate-bounce' : ''} />;
                         })()}
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-lg font-black tracking-tight uppercase italic leading-none">{group.name}</span>
+                        <span className="text-xs font-black tracking-tight uppercase italic leading-none">{group.name}</span>
                         <div className="flex items-center gap-2 mt-1">
-                           <span className="text-[10px] font-black text-accent bg-accent/10 px-2 py-0.5 rounded-md border border-accent/20 uppercase tracking-tighter">
+                           <span className="text-[9px] font-black text-accent bg-accent/10 px-1.5 py-0.5 rounded-md border border-accent/20 uppercase tracking-tighter">
                              {group.refreshInterval}M PULSE
                            </span>
-                           <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest leading-none">
-                             {group.keywords.length} TARGETS • {group.language || 'GLOBAL'}
+                           <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest leading-none">
+                             {group.keywords.length} TARGETS
                            </span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-end gap-0.5 relative z-10">
-                      {group.refreshInterval > 0 ? (
-                        <>
-                          <span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Next Scan</span>
-                          <span className={`text-xl font-black tabular-nums tracking-tighter italic leading-none ${
-                            isOverdue || isImminent ? 'text-red-500 animate-pulse' : 'text-white'
-                          }`}>
-                            {msRemaining > 0 ? (() => {
-                              const totalSecs = Math.floor(msRemaining / 1000);
-                              const h = Math.floor(totalSecs / 3600);
-                              const m = Math.floor((totalSecs % 3600) / 60);
-                              const s = totalSecs % 60;
-                              if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-                              return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-                            })() : (isGlobalSyncEnabled ? 'Scanning...' : 'Paused')}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Manual Trigger Required</span>
-                      )}
+                    <div className="flex items-center gap-4 relative z-10">
+                      <div className="flex flex-col items-end gap-0.5">
+                        {group.refreshInterval > 0 ? (
+                          <>
+                            <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">Next Scan</span>
+                            <span className={`text-sm font-black tabular-nums tracking-tighter italic leading-none ${
+                              isOverdue ? 'text-accent animate-pulse' : 
+                              isImminent ? 'text-accent animate-pulse' : 'text-white'
+                            }`}>
+                              {msRemaining > 0 ? (() => {
+                                const totalSecs = Math.floor(msRemaining / 1000);
+                                const h = Math.floor(totalSecs / 3600);
+                                const m = Math.floor((totalSecs % 3600) / 60);
+                                const s = totalSecs % 60;
+                                if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                                return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                              })() : (isGlobalSyncEnabled ? 'SYNCING...' : 'PAUSED')}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">Manual Mode</span>
+                        )}
+                      </div>
+
+                      <button 
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          setIsScanningAtId(group.id);
+                          await handleFetch(group.keywords.map(k => k.word), group.language, group.country, group.id);
+                          setTimeout(() => setIsScanningAtId(null), 2000);
+                        }}
+                        disabled={isScanningAtId === group.id}
+                        className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-accent/20 border border-white/5 hover:border-accent/40 group/mref transition-all active:scale-90"
+                        title="Force Intelligence Scan"
+                      >
+                        <RefreshCcw size={14} className={`text-white/40 group-hover/mref:text-accent ${isScanningAtId === group.id ? 'animate-spin' : ''}`} />
+                      </button>
                     </div>
                   </motion.div>
                 );
