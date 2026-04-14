@@ -1224,7 +1224,7 @@ export default function Home() {
                         {group.refreshInterval > 0 ? (
                           <>
                             <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">Next Scan</span>
-                            <span className={`text-sm font-black tabular-nums tracking-tighter italic leading-none ${
+                            <span className={`text-xs font-black tabular-nums tracking-tighter italic leading-none ${
                               isOverdue ? 'text-accent animate-pulse' : 
                               isImminent ? 'text-accent animate-pulse' : 'text-white'
                             }`}>
