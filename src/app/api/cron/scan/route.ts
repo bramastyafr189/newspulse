@@ -86,12 +86,33 @@ export async function GET(req: Request) {
         if (channel.notificationsEnabled) {
           const subscriptions = await db.query.pushSubscriptions.findMany();
           
+          // Construct a "Smart" notification payload
+          let notificationTitle = `Intelligence: ${channel.name}`;
+          let notificationBody = "";
+
+          if (newArticles.length === 1) {
+            // Rule for single article: Show the direct title
+            notificationBody = newArticles[0].title;
+          } else {
+            // Rule for multiple articles: Show a summarized list
+            const count = newArticles.length;
+            const bulletPoints = newArticles
+              .slice(0, 3)
+              .map(a => `• ${a.title.slice(0, 60)}${a.title.length > 60 ? '...' : ''}`)
+              .join('\n');
+            
+            notificationBody = `${count} target acquisitions detected:\n${bulletPoints}${count > 3 ? `\n...and ${count - 3} more signals.` : ''}`;
+          }
+
           const payload = JSON.stringify({
-            title: `Intelligence: ${channel.name}`,
-            body: `Intercepted ${newArticles.length} new signals from the feed.`,
+            title: notificationTitle,
+            body: notificationBody,
             icon: '/icon-192x192.png',
-            tag: `channel-${channel.id}`,
-            data: { url: '/' }
+            badge: '/icon-192x192.png',
+            tag: `intel-${channel.id}`, // Groups notifications by channel on Android
+            data: {
+              url: '/?tab=account' // Directs to Logs on click
+            }
           });
 
           for (const sub of subscriptions) {

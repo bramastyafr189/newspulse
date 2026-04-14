@@ -300,6 +300,18 @@ export default function Home() {
     return () => clearInterval(syncInterval);
   }, []);
 
+  // Handle Deep Linking from Notifications
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const targetTab = params.get('tab');
+    if (targetTab === 'account' || targetTab === 'home' || targetTab === 'explore') {
+      setActiveTab(targetTab as any);
+      
+      // Clean up URL to keep it pretty
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
   // Real-time ticker for countdown precision
   useEffect(() => {
     const timer = setInterval(() => {
