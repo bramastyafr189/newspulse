@@ -1138,10 +1138,22 @@ export default function Home() {
       {activeTab === 'explore' && (
         <div className="pt-20 px-4 sm:px-6 w-full max-w-[720px] mx-auto flex flex-col gap-4 fade-in pb-20">
           <div className="flex items-center justify-between px-2">
-            <h2 className="text-[11px] font-black uppercase tracking-[0.2em] text-white/30">Monitoring Hub</h2>
+            <div className="flex flex-col">
+              <h2 className="text-[11px] font-black uppercase tracking-[0.2em] text-white/30">Intelligence Monitor</h2>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                <span className="text-[9px] font-bold text-accent/60 uppercase tracking-widest">
+                  System Pulse: {(() => {
+                    const lastPulses = groups.map(g => g.lastScanAt ? new Date(g.lastScanAt).getTime() : 0);
+                    const lastPulse = Math.max(...lastPulses, 0);
+                    return lastPulse > 0 ? new Date(lastPulse).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Waiting...';
+                  })()}
+                </span>
+              </div>
+            </div>
             <div className="flex items-center gap-2">
                <div className={`w-2 h-2 rounded-full ${isGlobalSyncEnabled ? 'bg-accent animate-pulse shadow-[0_0_10px_var(--accent)]' : 'bg-white/10'}`} />
-               <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{isGlobalSyncEnabled ? 'Live Connection' : 'Offline'}</span>
+               <span className="text-[10px] font-black text-white/40 uppercase tracking-widest leading-none">{isGlobalSyncEnabled ? 'Live Monitor' : 'Offline'}</span>
             </div>
           </div>
 
