@@ -1189,7 +1189,7 @@ export default function Home() {
                              {group.refreshInterval}M PULSE
                            </span>
                            <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest leading-none">
-                             {group.keywords.length} TARGETS
+                             {group.keywords.length} TARGETS • {group.language?.toUpperCase() || 'GLOBAL'}
                            </span>
                         </div>
                       </div>
