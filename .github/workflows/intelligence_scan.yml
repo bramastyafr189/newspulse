@@ -9,7 +9,24 @@ jobs:
   scan:
     runs-on: ubuntu-latest
     steps:
+      - name: Validate Secrets
+        run: |
+          if [ -z "${{ secrets.VERCEL_URL }}" ]; then
+            echo "Error: VERCEL_URL secret is missing. Please add it in GitHub Settings > Secrets."
+            exit 1
+          fi
+          if [ -z "${{ secrets.CRON_SECRET }}" ]; then
+            echo "Error: CRON_SECRET secret is missing. Please add it in GitHub Settings > Secrets."
+            exit 1
+          fi
+
       - name: Trigger NewsPulse Scanner
         run: |
-          curl -f -X GET "${{ secrets.VERCEL_URL }}/api/cron/scan" \
-          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+          # Remove trailing slash if exists to prevent double slashes
+          URL=$(echo "${{ secrets.VERCEL_URL }}" | sed 's/\/$//')
+          
+          echo "Triggering scan at $URL/api/cron/scan..."
+          
+          curl -f -s -X GET "$URL/api/cron/scan" \
+          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+          -o /dev/null -w "Status: %{http_code}\n"
