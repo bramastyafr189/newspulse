@@ -1,8 +1,5 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron/scan",
-      "schedule": "*/15 * * * *"
-    }
-  ]
+  "github": {
+    "silent": true
+  }
 }

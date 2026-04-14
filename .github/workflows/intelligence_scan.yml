@@ -1,0 +1,15 @@
+name: Intelligence Engine Pulse
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # Allows manual trigger for testing
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger NewsPulse Scanner
+        run: |
+          curl -f -X GET "${{ secrets.VERCEL_URL }}/api/cron/scan" \
+          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
