@@ -1,7 +1,7 @@
 import { db } from '@/db';
-import { interests, intelligenceLogs, capturedArticles, pushSubscriptions } from '@/db/schema';
+import { interests, intelligenceLogs, capturedArticles, pushSubscriptions, systemSettings } from '@/db/schema';
 import { getNewsOnServer } from '@/lib/news-fetcher';
-import { eq } from 'drizzle-orm';
+import { eq, lte } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import webpush from 'web-push';
 
@@ -22,7 +22,25 @@ export async function GET(req: Request) {
   console.log('[CRON] Starting global intelligence scan...');
   
   try {
-    // 1. Fetch all channels
+    // 0. Self-Cleaning: Delete logs older than 24 hours
+    const cutoffDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await db.delete(intelligenceLogs).where(lte(intelligenceLogs.timestamp, cutoffDate));
+    console.log('[CRON] Database cleanup complete: Removed signals older than 24h.');
+
+    // 1. Check Global Kill Switch
+    const globalSettings = await db.query.systemSettings.findFirst({
+      where: eq(systemSettings.id, 'global')
+    });
+
+    if (globalSettings && !globalSettings.isSyncEnabled) {
+      console.log('[CRON] Scan aborted: Intelligence Engine is disabled globally.');
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Intelligence Engine is disabled globally.' 
+      });
+    }
+
+    // 2. Fetch all channels
     const channels = await db.query.interests.findMany({
       with: {
         keywords: true

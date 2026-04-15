@@ -66,3 +66,12 @@ export const pushSubscriptions = sqliteTable('push_subscriptions', {
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`CURRENT_TIMESTAMP`),
 });
 
+export const systemSettings = sqliteTable('system_settings', {
+  id: text('id').primaryKey(), // Using "global" as the id
+  isSyncEnabled: integer('is_sync_enabled', { mode: 'boolean' }).notNull().default(true),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const interestsRelations = relations(interests, ({ many }) => ({
+  keywords: many(keywords),
+}));

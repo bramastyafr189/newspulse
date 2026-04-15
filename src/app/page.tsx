@@ -347,22 +347,27 @@ export default function Home() {
     groupsRef.current = groups;
   }, [groups]);
 
-  // Load Groups and Keywords
+  // Load Groups, Keywords, and Global Settings
   const loadData = useCallback(async () => {
     try {
+      // 1. Fetch Interests
       const resp = await fetch('/api/interests');
       const data = await resp.json();
-      
       if (Array.isArray(data)) {
         setGroups(data);
         if (data.length > 0 && activeGroupId === null) {
           setActiveGroupId(data[0].id);
         }
-      } else {
-        setGroups([]);
+      }
+
+      // 2. Fetch Global Settings
+      const setResp = await fetch('/api/settings');
+      const setData = await setResp.json();
+      if (setData && typeof setData.isSyncEnabled === 'boolean') {
+        setIsGlobalSyncEnabled(setData.isSyncEnabled);
       }
     } catch (e) {
-      setGroups([]);
+      console.error('Failed to load data:', e);
     }
   }, [activeGroupId]);
 
@@ -371,18 +376,21 @@ export default function Home() {
     if ("Notification" in window) {
       setNotificationsAllowed(Notification.permission === "granted");
     }
-    
-    // Load global sync preference
-    const savedSync = localStorage.getItem('newspulse_global_sync');
-    if (savedSync !== null) {
-      setIsGlobalSyncEnabled(savedSync === 'true');
-    }
   }, [loadData]);
 
-  const toggleGlobalSync = (enabled: boolean) => {
+  const toggleGlobalSync = async (enabled: boolean) => {
     setIsGlobalSyncEnabled(enabled);
-    localStorage.setItem('newspulse_global_sync', String(enabled));
-    showToast(enabled ? "Global monitoring activated" : "Global monitoring suspended", enabled ? "success" : "info");
+    try {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isSyncEnabled: enabled })
+      });
+      showToast(enabled ? "Global monitoring activated" : "Global monitoring suspended", enabled ? "success" : "info");
+    } catch (e) {
+      showToast("Failed to sync system status", "error");
+      setIsGlobalSyncEnabled(!enabled); // Rollback
+    }
   };
 
   const activeGroup = groups.find(g => g.id === activeGroupId);
@@ -1155,7 +1163,7 @@ export default function Home() {
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
                 <span className="text-[9px] font-bold text-accent/60 uppercase tracking-widest">
-                  System Pulse: {(() => {
+                  System Pulse: {!isGlobalSyncEnabled ? 'SYSTEM PAUSED' : (() => {
                     const lastPulses = groups.map(g => g.lastScanAt ? new Date(g.lastScanAt).getTime() : 0);
                     const lastPulse = Math.max(...lastPulses, 0);
                     return lastPulse > 0 ? new Date(lastPulse).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Waiting...';
