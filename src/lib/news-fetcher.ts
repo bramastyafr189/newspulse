@@ -23,15 +23,29 @@ export async function getNewsOnServer(q: string, lang = 'any') {
 
   let articles = feed.items.slice(0, 50).map((item, index) => {
     const fullTitle = decode(item.title || '');
+    const title = fullTitle.includes(' - ') ? fullTitle.split(' - ').slice(0, -1).join(' - ') : fullTitle;
+    
     let description = decode(item.contentSnippet || item.content || '');
     description = description.replace(/<[^>]+>/g, '').trim();
 
-    let image = null;
+    // Remove redundant title and source from the description
+    // Google News often puts "Title - Source" at the start of the content snippet
+    if (description.startsWith(fullTitle)) {
+      description = description.substring(fullTitle.length).trim();
+    } else if (description.startsWith(title)) {
+      description = description.substring(title.length).trim();
+    }
+
+    // Clean up leading punctuation that might remain after removing the title (e.g. " - " or ": ")
+    description = description.replace(/^[\s\-\:\u00A0]+/, '').trim();
+
+    let image: string | null = null;
     if (item.content) {
       const imgMatch = item.content.match(/<img[^>]+src="([^">]+)"/);
       if (imgMatch) image = imgMatch[1];
     }
 
+    // Extract source name correctly
     let sourceName = 'Google Intelligence';
     if (item.source) {
       sourceName = item.source as string;
@@ -40,7 +54,10 @@ export async function getNewsOnServer(q: string, lang = 'any') {
       sourceName = parts.pop() || sourceName;
     }
 
-    const title = fullTitle.includes(' - ') ? fullTitle.split(' - ').slice(0, -1).join(' - ') : fullTitle;
+    // If description is identical to sourceName, it's redundant
+    if (description === sourceName) {
+      description = '';
+    }
 
     return {
       id: item.guid || `${Date.now()}-${index}`,

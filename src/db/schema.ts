@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { relations } from 'drizzle-orm';
 import { sql } from 'drizzle-orm';
 
@@ -14,6 +14,8 @@ export const capturedArticles = sqliteTable('captured_articles', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   logId: text('log_id').notNull().references(() => intelligenceLogs.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
+  description: text('description'),
+  image: text('image'),
   url: text('url').notNull(),
   source: text('source').notNull(),
   publishedAt: text('published_at').notNull(),
@@ -60,7 +62,7 @@ export const keywordRelations = relations(keywords, ({ one }) => ({
 
 export const pushSubscriptions = sqliteTable('push_subscriptions', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  endpoint: text('endpoint').notNull().unique(),
+  endpoint: text('endpoint').notNull(),
   p256dh: text('p256dh').notNull(),
   auth: text('auth').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`CURRENT_TIMESTAMP`),

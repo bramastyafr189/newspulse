@@ -1118,7 +1118,9 @@ export default function Home() {
                        <span className="text-white/80">{article.source}</span>
                     </div>
                     <h3 className="text-[17px] sm:text-xl font-black leading-[1.2] tracking-tight group-hover:text-accent transition-colors">{article.title}</h3>
-                    <p className="text-xs sm:text-sm text-white/50 line-clamp-2 leading-relaxed">{article.description}</p>
+                    {article.description && (
+                      <p className="text-xs sm:text-sm text-white/50 line-clamp-2 leading-relaxed">{article.description}</p>
+                    )}
                   </div>
                   
                   {article.image && (

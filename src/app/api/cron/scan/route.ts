@@ -88,6 +88,7 @@ export async function GET(req: Request) {
             newArticles.map(art => ({
               logId: logId,
               title: art.title,
+              description: art.description,
               url: art.url,
               source: art.source,
               publishedAt: art.publishedAt,

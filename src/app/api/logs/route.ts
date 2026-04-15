@@ -45,6 +45,7 @@ export async function POST(req: Request) {
           articles.map((art: any) => ({
             logId: id,
             title: art.title,
+            description: art.description,
             url: art.url,
             source: art.source,
             publishedAt: art.publishedAt,
