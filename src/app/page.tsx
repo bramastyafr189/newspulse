@@ -304,13 +304,25 @@ export default function Home() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const targetTab = params.get('tab');
+    const logId = params.get('logId');
+
     if (targetTab === 'account' || targetTab === 'home' || targetTab === 'explore') {
       setActiveTab(targetTab as any);
-      
-      // Clean up URL to keep it pretty
-      window.history.replaceState({}, document.title, window.location.pathname);
+
+      // If we have a logId and we are in the account tab, try to find and open the log
+      if (targetTab === 'account' && logId && historyLogs.length > 0) {
+        const log = historyLogs.find(l => l.id === logId);
+        if (log) {
+          setSelectedLog(log);
+          // Clean up URL to keep it pretty
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      } else if (!logId) {
+        // Just tab change, clean up
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
     }
-  }, []);
+  }, [historyLogs]); // Re-run when logs are loaded to handle the logId deep link
 
   // Real-time ticker for countdown precision
   useEffect(() => {
