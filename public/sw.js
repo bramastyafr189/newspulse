@@ -1,4 +1,4 @@
-const CACHE_NAME = 'newspulse-v2'; // Increment version to bust old cache
+const CACHE_NAME = 'newspulse-v3'; // Increment version to bust old cache
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.json',
@@ -64,21 +64,26 @@ self.addEventListener('push', (event) => {
 
 // Handle notification clicks
 self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
+  const notification = event.notification;
+  const targetUrl = notification.data?.url || '/';
   
-  // Focus or open the app window
+  notification.close();
+  
+  // Focus or open the app window and navigate to the deep link
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      if (clientList.length > 0) {
-        let client = clientList[0];
-        for (let i = 0; i < clientList.length; i++) {
-          if (clientList[i].focused) {
-            client = clientList[i];
-          }
+      // If a window is already open, focus it and navigate to the target URL
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin)) {
+          return client.focus().then((focusedClient) => {
+            return focusedClient.navigate(targetUrl);
+          });
         }
-        return client.focus();
       }
-      return clients.openWindow('/');
+      // If no window is open, open a new one with the target URL
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
     })
   );
 });

@@ -353,11 +353,86 @@ export default function Home() {
   }, []);
 
   const groupsRef = useRef<InterestGroup[]>([]);
+  const modalHistoryRef = useRef(false);
+
+  // Sync modal state with browser history for "back-to-close" behavior
+  useEffect(() => {
+    const isAnyModalOpen = !!(
+      selectedLog || 
+      showSettings || 
+      isCreatingGroup || 
+      showClearLogsModal || 
+      isRenamingGroupId ||
+      groupToDelete ||
+      keywordToDelete
+    );
+
+    if (isAnyModalOpen && !modalHistoryRef.current) {
+      window.history.pushState({ modalOpen: true }, "");
+      modalHistoryRef.current = true;
+    } else if (!isAnyModalOpen && modalHistoryRef.current) {
+      // Manual close - remove the dummy history entry
+      modalHistoryRef.current = false;
+      if (window.history.state?.modalOpen) {
+        window.history.back();
+      }
+    }
+  }, [
+    !!selectedLog, 
+    showSettings, 
+    isCreatingGroup, 
+    showClearLogsModal, 
+    !!isRenamingGroupId,
+    !!groupToDelete,
+    !!keywordToDelete
+  ]);
+
+  // Global popstate listener to catch the hardware/browser back button
+  useEffect(() => {
+    const handlePopState = () => {
+      if (modalHistoryRef.current) {
+        modalHistoryRef.current = false;
+        setSelectedLog(null);
+        setShowSettings(false);
+        setIsCreatingGroup(false);
+        setShowClearLogsModal(false);
+        setIsRenamingGroupId(null);
+        setGroupToDelete(null);
+        setKeywordToDelete(null);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   // Update ref whenever groups change so polling has latest config
   useEffect(() => {
     groupsRef.current = groups;
   }, [groups]);
+
+  // Handle deep-linking from notifications (?tab=account&logId=XYZ)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    const logId = params.get('logId');
+
+    if (tab === 'account') {
+      setActiveTab('account');
+    }
+
+    if (logId && historyLogs.length > 0) {
+      const log = historyLogs.find(l => l.id === logId);
+      if (log) {
+        setSelectedLog(log);
+        // Clean up URL to prevent re-opening on manual refresh
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, [historyLogs.length]);
 
   // Load Groups, Keywords, and Global Settings
   const loadData = useCallback(async () => {
