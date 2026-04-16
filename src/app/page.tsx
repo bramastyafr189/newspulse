@@ -1433,7 +1433,8 @@ export default function Home() {
                   viewport={{ once: true, margin: "-20px" }}
                   transition={{ duration: 0.3, delay: Math.min(idx * 0.05, 0.2) }}
                   key={log.id}
-                  className="card-rich p-4 sm:p-6 flex flex-col gap-4 sm:gap-6 group border border-white/5 relative overflow-hidden"
+                  onClick={() => setSelectedLog(log)}
+                  className="card-rich p-4 sm:p-6 flex flex-col gap-4 sm:gap-6 group border border-white/5 relative overflow-hidden cursor-pointer hover:bg-white/[0.04] active:scale-[0.98] transition-all"
                 >
                   <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
                     {(() => {
@@ -1450,7 +1451,7 @@ export default function Home() {
                          {log.title.includes('Intelligence Acquired') ? `+${log.title.match(/\d+/)?.[0] || ''}` : log.title}
                        </span>
                     </div>
-                    <span className="text-[9px] font-black text-white/20 tabular-nums uppercase">
+                    <span className="text-[9px] font-black text-white/50 tabular-nums uppercase">
                       {formatTimeAgo(log.timestamp)}
                     </span>
                   </div>
@@ -1461,28 +1462,21 @@ export default function Home() {
                         {log.articles.slice(0, 3).map((art, i) => (
                           <div 
                             key={i} 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              window.open(art.url, '_blank');
-                            }}
-                            className="flex flex-col gap-0.5 border-l border-white/5 pl-3 py-0.5 cursor-pointer hover:border-accent/40 group/art transition-all"
+                            className="flex flex-col gap-0.5 border-l border-white/5 pl-3 py-0.5 transition-all"
                           >
-                            <span className="text-[11px] font-bold text-white/70 line-clamp-1 leading-tight group-hover/art:text-white transition-colors">{art.title}</span>
+                            <span className="text-[11px] font-bold text-accent/80 line-clamp-1 leading-tight transition-colors">{art.title}</span>
                             <div className="flex items-center gap-2">
-                              <span className="text-[8px] font-black text-accent/50 uppercase tracking-widest">{art.source}</span>
+                              <span className="text-[8px] font-black text-white/40 uppercase tracking-widest">{art.source}</span>
                               <span className="w-0.5 h-0.5 rounded-full bg-white/10" />
                               <span className="text-[8px] font-black text-white/20 uppercase tabular-nums">{formatTimeAgo(art.publishedAt)}</span>
                             </div>
                           </div>
                         ))}
-                        {log.articles.length > 3 && (
-                          <button 
-                            onClick={() => setSelectedLog(log)}
-                            className="text-[9px] font-black text-accent/60 hover:text-accent italic ml-3 transition-colors uppercase tracking-widest"
-                          >
-                            + {log.articles.length - 3} MORE ENTRIES • CLICK TO EXPAND
-                          </button>
-                        )}
+                        
+                        <div className="mt-2 text-[9px] font-black text-accent/40 group-hover:text-accent italic ml-3 transition-colors uppercase tracking-widest flex items-center gap-2">
+                           <span>{log.articles.length > 3 ? `+${log.articles.length - 3} more signals • ` : ''}Click to expand detection report</span>
+                           <ChevronRight size={10} className="group-hover:translate-x-0.5 transition-transform" />
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1910,7 +1904,7 @@ export default function Home() {
                    <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-3">
                          <span className="text-[10px] font-black text-accent border border-accent/20 bg-accent/5 px-3 py-1 rounded-lg uppercase tracking-[.2em]">{selectedLog.channel}</span>
-                         <span className="text-[10px] font-black text-white/20 uppercase tracking-widest">{formatTimeAgo(selectedLog.timestamp)}</span>
+                         <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">{formatTimeAgo(selectedLog.timestamp)}</span>
                       </div>
                       <h3 className="text-lg font-black italic uppercase tracking-tighter mt-1">
                         {selectedLog.title.includes('Intelligence Acquired') ? `+${selectedLog.title.match(/\d+/)?.[0] || ''}` : selectedLog.title} ARTICLES RECOVERED
@@ -1934,12 +1928,12 @@ export default function Home() {
                          className="flex flex-col gap-1.5 p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-accent/40 hover:bg-accent/5 transition-all group/art cursor-pointer"
                          onClick={() => window.open(article.url, '_blank')}
                       >
-                         <div className="flex items-center gap-3 text-[9px] font-black text-accent/60 uppercase tracking-widest">
+                         <div className="flex items-center gap-3 text-[9px] font-black text-white/40 uppercase tracking-widest">
                             <span>{article.source}</span>
                             <span className="w-1 h-1 rounded-full bg-white/10" />
-                            <span className="text-white/20">{formatTimeAgo(article.publishedAt)}</span>
+                            <span className="text-white/40">{formatTimeAgo(article.publishedAt)}</span>
                          </div>
-                         <h4 className="text-[13px] font-bold text-white group-hover/art:text-white leading-snug transition-colors">{article.title}</h4>
+                         <h4 className="text-[13px] font-bold text-accent group-hover/art:text-white leading-snug transition-colors">{article.title}</h4>
                       </motion.div>
                    ))}
                 </div>
